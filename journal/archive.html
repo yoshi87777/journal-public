@@ -1,0 +1,1353 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>archive — life-os</title>
+<link rel="stylesheet" href="_tokens.css">
+<style>
+  /* ---------------------------------------------------------------
+     archive.html — local overrides (only what _tokens.css doesn't cover)
+     Keep ALL color/font/size decisions inside tokens where possible.
+     --------------------------------------------------------------- */
+
+  /* Header stats row */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    margin-bottom: 36px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .stat {
+    padding: 18px 18px 18px 0;
+    border-right: 1px solid var(--border);
+  }
+  .stat:last-child { border-right: 0; padding-right: 0; }
+  .stat:not(:first-child) { padding-left: 18px; }
+  .stat-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .stat-value {
+    font-family: var(--font-num);
+    font-feature-settings: "tnum";
+    font-size: 32px;
+    line-height: 1;
+    color: var(--fg);
+  }
+  .stat-value .denom {
+    font-size: 14px;
+    color: var(--muted-2);
+    margin-left: 4px;
+  }
+  .stat-value.empty { color: var(--muted-2); }
+
+  /* On this day callout */
+  .otd {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--tight);
+    color: var(--muted);
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .otd .otd-tag {
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: var(--wide);
+  }
+  .otd .otd-shift {
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: var(--wide);
+  }
+  .otd .sep { color: var(--muted-2); }
+  .otd .otd-date { color: var(--fg); }
+  .otd .otd-quote { color: var(--muted); font-family: var(--font-sans); font-size: 13px; }
+  .otd .otd-jump { margin-left: auto; color: var(--muted); text-decoration: none; }
+  .otd .otd-jump:hover { color: var(--accent); }
+  .otd[hidden] { display: none; }
+
+  /* Section heads (mono, uppercase) */
+  .section-head {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 36px 0 14px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .section-head .hint { color: var(--muted-2); font-size: 10px; }
+  .section-head .spacer { flex: 1; border-bottom: 1px solid var(--border); position: relative; top: -3px; margin-left: 4px; }
+
+  /* ---------- 14. Color mosaic calendar ---------- */
+  .mosaic-wrap { margin-bottom: 12px; overflow-x: auto; }
+  .mosaic {
+    display: grid;
+    grid-template-rows: repeat(7, 11px);
+    grid-auto-flow: column;
+    grid-auto-columns: 11px;
+    gap: 2px;
+    padding: 4px 0;
+    min-width: max-content;
+  }
+  .mc {
+    width: 11px;
+    height: 11px;
+    background: var(--muted-2);
+    opacity: 0.25;
+    border-radius: var(--r-0);
+    cursor: default;
+    transition: outline-color var(--t-fast) var(--ease), opacity var(--t-fast) var(--ease);
+    outline: 1px solid transparent;
+    outline-offset: 0;
+  }
+  .mc.has-entry { opacity: 1; cursor: pointer; }
+  .mc.has-entry:hover { outline-color: var(--fg); }
+  .mc.active,
+  .mc.has-entry.active,
+  .mc.has-entry.active:hover { outline-color: var(--accent); }
+  .mosaic-legend {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--tight);
+    color: var(--muted-2);
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+  }
+
+  /* Side panel (entry preview) */
+  .side-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(440px, 92vw);
+    background: var(--bg-2);
+    border-left: 1px solid var(--border-2);
+    transform: translateX(100%);
+    transition: transform var(--t-base) var(--ease);
+    z-index: 50;
+    overflow-y: auto;
+    padding: 28px 24px 60px;
+  }
+  .side-panel.open { transform: translateX(0); }
+  .side-panel .sp-close {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+  .side-panel .sp-close:hover { color: var(--accent); }
+  .side-panel .sp-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .side-panel .sp-title {
+    font-family: var(--font-sans);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-bottom: 24px;
+  }
+  .side-panel .sp-accent-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: 1px;
+  }
+  .scrim {
+    position: fixed; inset: 0;
+    background: var(--scrim);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--t-base) var(--ease);
+    z-index: 40;
+  }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+
+  /* ---------- 15. Mood sparkline ---------- */
+  .spark-wrap {
+    border-top: 1px solid var(--border);
+    padding: 18px 0 8px;
+    margin-bottom: 12px;
+  }
+  .spark-tabs {
+    display: flex;
+    gap: 16px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .spark-tab {
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 4px 0;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    transition: color var(--t-fast) var(--ease);
+  }
+  .spark-tab:hover { color: var(--fg); }
+  .spark-tab.active { color: var(--accent); }
+  .spark-caption {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--tight);
+    color: var(--muted);
+    min-height: 16px;
+    margin-bottom: 6px;
+    font-feature-settings: "tnum";
+  }
+  .spark-caption .v { color: var(--fg); }
+  .spark-caption .empty { color: var(--muted-2); }
+  .spark-svg {
+    width: 100%;
+    height: 160px;
+    display: block;
+  }
+  .spark-svg .axis-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    fill: var(--muted-2);
+    letter-spacing: 0.04em;
+  }
+  .spark-svg .spark-path {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .spark-svg .spark-dot {
+    fill: var(--accent);
+    opacity: 0;
+    transition: opacity var(--t-fast) var(--ease);
+  }
+  .spark-svg .spark-dot.on { opacity: 1; }
+  .spark-svg .cursor-line {
+    stroke: var(--accent);
+    stroke-width: 1;
+    stroke-dasharray: 2 2;
+    opacity: 0;
+  }
+  .spark-svg .cursor-line.on { opacity: 0.6; }
+
+  /* ---------- 16. Tag cloud ---------- */
+  .tag-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    align-items: baseline;
+    margin-bottom: 12px;
+    padding: 4px 0;
+    line-height: 1.1;
+  }
+  .tag-cloud .tc {
+    font-family: var(--font-mono);
+    color: var(--muted);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 0;
+    letter-spacing: var(--tight);
+    text-transform: lowercase;
+    transition: color var(--t-fast) var(--ease);
+  }
+  .tag-cloud .tc:hover { color: var(--fg); }
+  .tag-cloud .tc.top { color: var(--accent); }
+  .tag-cloud .tc.active {
+    color: var(--bg);
+    background: var(--accent);
+    padding: 0 6px;
+    border-radius: var(--r-1);
+  }
+  .tag-cloud .tc .freq {
+    font-size: 9px;
+    color: var(--muted-2);
+    margin-left: 2px;
+    letter-spacing: 0;
+  }
+  .tag-cloud-empty {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted-2);
+  }
+  .active-filter {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    letter-spacing: var(--tight);
+  }
+  .active-filter[hidden] { display: none; }
+  .active-filter .clear {
+    color: var(--muted);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: var(--muted-2);
+    font: inherit;
+    padding: 0 0 0 6px;
+  }
+  .active-filter .clear:hover { color: var(--accent); }
+
+  /* ---------- Filter input ---------- */
+  .filter-wrap {
+    margin: 24px 0 8px;
+  }
+  .filter-wrap .filter-hint {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--tight);
+    color: var(--muted-2);
+    margin-top: 6px;
+  }
+  .filter-wrap code {
+    font-family: var(--font-mono);
+    color: var(--muted);
+  }
+  .filter-result-count {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 14px 0 4px;
+  }
+
+  /* ---------- Entries list ---------- */
+  .entries { margin-top: 4px; }
+  .entry {
+    padding: 28px 0;
+    border-top: 1px solid var(--border);
+  }
+  .entry:first-child { border-top: 1px solid var(--border-2); }
+  .entry-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .entry-date {
+    font-family: var(--font-sans);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+  }
+  .entry-meta {
+    font-family: var(--font-mono);
+    font-feature-settings: "tnum";
+    font-size: 11px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .entry-accent-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+  }
+
+  /* Value renderers — restyled, tokens-based */
+  .q-value-sans {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: var(--lh-body);
+    color: var(--fg);
+  }
+  .q-value-mono {
+    font-family: var(--font-num);
+    font-feature-settings: "tnum";
+    font-size: 18px;
+    color: var(--fg);
+  }
+  .q-value-mono .denom { color: var(--muted-2); font-size: 13px; margin-left: 6px; }
+  .q-value.empty {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted-2);
+    letter-spacing: var(--tight);
+  }
+  .q-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .q-emoji { font-size: 24px; line-height: 1; }
+  .q-stars { display: inline-flex; gap: 4px; }
+  .q-stars .s { color: var(--muted-2); }
+  .q-stars .s.lit { color: var(--accent); }
+  .q-color-row { display: inline-flex; gap: 10px; align-items: center; }
+  .q-color-sw {
+    width: 18px; height: 18px;
+    border: 1px solid var(--border-2);
+    border-radius: var(--r-0);
+  }
+  .q-color-hex {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  /* Inline-SVG bar readout for slider */
+  .q-bar-row { display: flex; align-items: center; gap: 12px; }
+  .q-bar-svg { width: 140px; height: 4px; display: block; }
+  .q-bar-svg .rail { stroke: var(--border-2); stroke-width: 2; }
+  .q-bar-svg .fill { stroke: var(--accent); stroke-width: 2; stroke-linecap: round; }
+
+  /* Timeline (archive readout) */
+  .q-timeline { display: grid; gap: 6px; }
+  .q-timeline .seg {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 12px;
+    align-items: baseline;
+  }
+  .q-timeline .seg-l {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .q-timeline .seg-v {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    color: var(--fg);
+  }
+  .q-timeline .seg-v.empty { color: var(--muted-2); font-size: 13px; }
+
+  /* English upgrades inside entry */
+  .entry .feedback-block { margin-top: 22px; padding-top: 18px; border-top: 1px dashed var(--border); }
+
+  /* Empty state */
+  .empty-state {
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 80px 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--muted);
+    text-align: left;
+  }
+
+  /* ---------- Theme toggle button ---------- */
+  .theme-toggle {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
+    border-radius: var(--r-1);
+    padding: 6px 9px;
+    cursor: pointer;
+    z-index: 30;
+    transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+  }
+  .theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* Tooltip used by the mosaic on hover */
+  .mosaic-tip {
+    position: fixed;
+    pointer-events: none;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--tight);
+    color: var(--fg);
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
+    padding: 4px 8px;
+    border-radius: var(--r-1);
+    z-index: 60;
+    opacity: 0;
+    transition: opacity var(--t-fast) var(--ease);
+    white-space: nowrap;
+  }
+  .mosaic-tip.on { opacity: 1; }
+
+  /* Responsive trims */
+  @media (max-width: 600px) {
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .stat { border-right: 0; border-bottom: 1px solid var(--border); padding-right: 0 !important; }
+    .stat:nth-child(odd) { border-right: 1px solid var(--border); padding-right: 12px !important; }
+    .stat:nth-last-child(-n+2) { border-bottom: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap wide">
+
+  <!-- 2. Status line -->
+  <div id="status" class="status"></div>
+
+  <!-- 3. Page title -->
+  <h1 class="page-title">archive<span class="dot">.</span></h1>
+
+  <!-- 4. Nav row -->
+  <nav class="nav" aria-label="primary">
+    <a href="today.html">→ today</a>
+    <a href="english.html">→ english notes</a>
+    <a href="archive.html" class="current">archive</a>
+  </nav>
+
+  <!-- 5. Header stats -->
+  <div class="stat-row" id="statRow"></div>
+
+  <!-- 6. On this day -->
+  <div id="otd" class="otd" hidden></div>
+
+  <!-- 14. Color mosaic calendar -->
+  <div class="section-head"><span>color mosaic · last 365d</span><span class="spacer"></span><span class="hint">hover · view entry</span></div>
+  <div class="mosaic-wrap">
+    <div id="mosaic" class="mosaic" role="grid" aria-label="365-day entry mosaic"></div>
+    <div class="mosaic-legend">
+      <span id="mosaicStart">—</span>
+      <span id="mosaicEnd">—</span>
+    </div>
+  </div>
+
+  <!-- 15. Mood sparkline -->
+  <div class="section-head"><span>mood sparkline</span><span class="spacer"></span>
+    <span class="hint">scrub →</span>
+  </div>
+  <div class="spark-wrap">
+    <div class="spark-tabs" role="tablist">
+      <button class="spark-tab" data-range="30">30d</button>
+      <button class="spark-tab active" data-range="90">90d</button>
+      <button class="spark-tab" data-range="365">365d</button>
+    </div>
+    <div id="sparkCaption" class="spark-caption"><span class="empty">// hover to scrub</span></div>
+    <svg id="sparkSvg" class="spark-svg" viewBox="0 0 800 160" preserveAspectRatio="none" aria-hidden="true"></svg>
+  </div>
+
+  <!-- 16. Tag cloud -->
+  <div class="section-head"><span>tag cloud · weight = font-size</span><span class="spacer"></span><span class="hint">click · filter</span></div>
+  <div id="tagCloud" class="tag-cloud"></div>
+
+  <!-- Filter input -->
+  <div class="section-head"><span>entries</span><span class="spacer"></span></div>
+  <div class="filter-wrap">
+    <input id="filterInput" class="text-input" type="text" placeholder="// filter: keyword, tag:foo, mood>5, accent:lime" autocomplete="off" spellcheck="false">
+    <div class="filter-hint">// tag:value · accent:name · mood&gt;N · mood&lt;N · keywords (AND)</div>
+  </div>
+  <div id="activeFilter" class="active-filter" hidden></div>
+  <div id="resultCount" class="filter-result-count"></div>
+
+  <!-- Entries list -->
+  <div id="entries" class="entries"></div>
+
+  <!-- 13. Path crumb -->
+  <div class="path-crumb">~/life-os/journal/archive.html</div>
+
+</div>
+
+<!-- Theme toggle -->
+<button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">[☾]</button>
+
+<!-- Side panel + scrim -->
+<div id="scrim" class="scrim" aria-hidden="true"></div>
+<aside id="sidePanel" class="side-panel" aria-hidden="true">
+  <button class="sp-close" id="spClose">[esc] close</button>
+  <div class="sp-meta" id="spMeta"></div>
+  <div class="sp-title" id="spTitle"></div>
+  <div id="spBody"></div>
+</aside>
+<div id="mosaicTip" class="mosaic-tip" role="tooltip" aria-hidden="true"></div>
+
+<!-- Inline data blocks (Claude updates these) -->
+<script id="entries-data" type="application/json">[]</script>
+<script id="patterns-data" type="application/json">[]</script>
+
+<script src="_accent.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ---------- Apply accent + status line ----------
+  lifeOs.applyAccent();
+  lifeOs.mountStatusLine(document.getElementById('status'), { page: 'ARCHIVE', version: 'v0.1' });
+
+  // ---------- Theme persistence ----------
+  (function initTheme() {
+    var stored = null;
+    try { stored = localStorage.getItem('lifeOs.theme'); } catch (e) {}
+    var html = document.documentElement;
+    if (stored === 'light') { html.classList.remove('dark'); html.classList.add('light'); }
+    else if (stored === 'dark') { html.classList.add('dark'); html.classList.remove('light'); }
+    var toggle = document.getElementById('themeToggle');
+    function paintToggle() {
+      toggle.textContent = html.classList.contains('dark') ? '[☾]' : '[☼]';
+    }
+    paintToggle();
+    toggle.addEventListener('click', function () {
+      var isDark = html.classList.contains('dark');
+      html.classList.toggle('dark', !isDark);
+      html.classList.toggle('light', isDark);
+      try { localStorage.setItem('lifeOs.theme', isDark ? 'light' : 'dark'); } catch (e) {}
+      paintToggle();
+    });
+  })();
+
+  // ---------- Helpers ----------
+  function escapeHTML(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c];
+    });
+  }
+  function parseISODate(s) {
+    if (!s) return null;
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+    if (!m) return null;
+    return new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10));
+  }
+  function fmtISO(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth()+1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + dd;
+  }
+  function oneliner(entry) {
+    // Best-effort short quote — first non-empty text-ish question
+    if (!entry || !entry.questions) return '';
+    for (var i = 0; i < entry.questions.length; i++) {
+      var q = entry.questions[i];
+      if (!q || q.value == null) continue;
+      if (typeof q.value === 'string' && q.value.trim()) {
+        var s = q.value.trim().replace(/\s+/g, ' ');
+        return s.length > 90 ? s.slice(0, 87) + '...' : s;
+      }
+      if (q.type === 'timeline' && q.value && typeof q.value === 'object') {
+        var first = ['morning','afternoon','evening']
+          .map(function (k) { return q.value[k]; })
+          .filter(function (v) { return v && String(v).trim(); })[0];
+        if (first) {
+          var t = String(first).trim().replace(/\s+/g, ' ');
+          return t.length > 90 ? t.slice(0, 87) + '...' : t;
+        }
+      }
+    }
+    return '(no text)';
+  }
+
+  // ---------- Load data ----------
+  var entries;
+  var patterns;
+  try { entries = JSON.parse(document.getElementById('entries-data').textContent || '[]'); }
+  catch (e) { entries = []; console.warn('entries-data parse failed', e); }
+  try { patterns = JSON.parse(document.getElementById('patterns-data').textContent || '[]'); }
+  catch (e) { patterns = []; }
+
+  function renderArchive() {
+  // Sort newest first by ISO date string
+  entries.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+
+  // ---------- 5. Stats ----------
+  var statRow = document.getElementById('statRow');
+  var moodValues = entries.flatMap(function (e) {
+    return (e.questions || [])
+      .filter(function (q) { return q.id === 'mood' && typeof q.value === 'number'; })
+      .map(function (q) { return q.value; });
+  });
+  var moodAvg = moodValues.length ? (moodValues.reduce(function (a,b){return a+b;},0) / moodValues.length) : null;
+
+  function computeStreak() {
+    if (!entries.length) return 0;
+    var dates = new Set(entries.map(function (e) { return e.date; }));
+    var streak = 0;
+    var d = new Date();
+    // Allow today not to break streak (count back from yesterday if today missing)
+    if (!dates.has(fmtISO(d))) d.setDate(d.getDate() - 1);
+    while (dates.has(fmtISO(d))) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    }
+    return streak;
+  }
+  function entriesThisMonth() {
+    var now = new Date();
+    var y = now.getFullYear(), m = now.getMonth();
+    var count = 0;
+    entries.forEach(function (e) {
+      var d = parseISODate(e.date);
+      if (d && d.getFullYear() === y && d.getMonth() === m) count++;
+    });
+    return count;
+  }
+  var streak = computeStreak();
+  var monthCount = entriesThisMonth();
+
+  statRow.innerHTML =
+    '<div class="stat">' +
+      '<div class="stat-label">entries</div>' +
+      '<div class="stat-value' + (entries.length ? '' : ' empty') + '">' + entries.length + '</div>' +
+    '</div>' +
+    '<div class="stat">' +
+      '<div class="stat-label">mood avg</div>' +
+      '<div class="stat-value' + (moodAvg == null ? ' empty' : '') + '">' +
+        (moodAvg == null ? '—' : moodAvg.toFixed(1) + '<span class="denom">/10</span>') +
+      '</div>' +
+    '</div>' +
+    '<div class="stat">' +
+      '<div class="stat-label">streak</div>' +
+      '<div class="stat-value' + (streak ? '' : ' empty') + '">' + streak + '<span class="denom">d</span></div>' +
+    '</div>' +
+    '<div class="stat">' +
+      '<div class="stat-label">this month</div>' +
+      '<div class="stat-value' + (monthCount ? '' : ' empty') + '">' + monthCount + '<span class="denom">d</span></div>' +
+    '</div>';
+
+  // ---------- 6. On this day ----------
+  (function buildOTD() {
+    var otd = document.getElementById('otd');
+    var today = new Date();
+    var byDate = {};
+    entries.forEach(function (e) { byDate[e.date] = e; });
+    var targets = [
+      { label: '1 MONTH AGO', shift: function (d) { var x = new Date(d); x.setMonth(x.getMonth() - 1); return x; } },
+      { label: '6 MONTHS AGO', shift: function (d) { var x = new Date(d); x.setMonth(x.getMonth() - 6); return x; } },
+      { label: '1 YEAR AGO', shift: function (d) { var x = new Date(d); x.setFullYear(x.getFullYear() - 1); return x; } },
+    ];
+    var hit = null;
+    for (var i = 0; i < targets.length; i++) {
+      var target = targets[i];
+      var when = target.shift(today);
+      var key = fmtISO(when);
+      if (byDate[key]) { hit = { label: target.label, entry: byDate[key], key: key }; break; }
+    }
+    if (!hit) return;
+    var quote = oneliner(hit.entry);
+    otd.innerHTML =
+      '<span class="otd-tag">on this day</span>' +
+      '<span class="sep">·</span>' +
+      '<span class="otd-shift">' + escapeHTML(hit.label) + '</span>' +
+      '<span class="sep">·</span>' +
+      '<span class="otd-date">' + escapeHTML(hit.key) + '</span>' +
+      '<span class="sep">·</span>' +
+      '<span class="otd-quote">"' + escapeHTML(quote) + '"</span>' +
+      '<a class="otd-jump" href="#entry-' + escapeHTML(hit.key) + '">[jump]</a>';
+    otd.hidden = false;
+  })();
+
+  // ---------- 14. Color mosaic ----------
+  var mosaicEl = document.getElementById('mosaic');
+  var tipEl = document.getElementById('mosaicTip');
+  var byDateGlobal = {};
+  entries.forEach(function (e) { byDateGlobal[e.date] = e; });
+
+  (function buildMosaic() {
+    var today = new Date();
+    today.setHours(0,0,0,0);
+    var start = new Date(today);
+    start.setDate(start.getDate() - 364);
+
+    // Align so columns start on Sunday (matches GitHub-grid feel)
+    var pad = start.getDay();
+    var first = new Date(start);
+    first.setDate(first.getDate() - pad);
+
+    var totalDays = pad + 365;
+    var rows = 7;
+    var cols = Math.ceil(totalDays / rows);
+    var html = '';
+    for (var c = 0; c < cols; c++) {
+      for (var r = 0; r < rows; r++) {
+        var idx = c * rows + r;
+        var d = new Date(first);
+        d.setDate(first.getDate() + idx);
+        // skip pad days and any future days
+        if (idx < pad || d > today) {
+          html += '<div class="mc" style="visibility:hidden"></div>';
+          continue;
+        }
+        var iso = fmtISO(d);
+        var entry = byDateGlobal[iso];
+        if (entry) {
+          var hex = (entry.accent && entry.accent.hex) ? entry.accent.hex : '#7a7a7a';
+          html += '<div class="mc has-entry" data-date="' + iso + '" style="background:' + escapeHTML(hex) + ';opacity:1"></div>';
+        } else {
+          html += '<div class="mc" data-date="' + iso + '"></div>';
+        }
+      }
+    }
+    mosaicEl.innerHTML = html;
+    document.getElementById('mosaicStart').textContent = fmtISO(start);
+    document.getElementById('mosaicEnd').textContent = fmtISO(today);
+
+    // Hover tooltip + click → side panel
+    mosaicEl.addEventListener('mousemove', function (ev) {
+      var t = ev.target.closest('.mc');
+      if (!t || !t.dataset.date) { tipEl.classList.remove('on'); return; }
+      var iso = t.dataset.date;
+      var entry = byDateGlobal[iso];
+      var label = entry
+        ? iso + ' · ' + (entry.accent ? entry.accent.name : '')
+        : iso + ' · no entry';
+      tipEl.textContent = label;
+      tipEl.classList.add('on');
+      var x = ev.clientX + 10, y = ev.clientY + 14;
+      tipEl.style.left = x + 'px';
+      tipEl.style.top = y + 'px';
+    });
+    mosaicEl.addEventListener('mouseleave', function () { tipEl.classList.remove('on'); });
+    mosaicEl.addEventListener('click', function (ev) {
+      var t = ev.target.closest('.mc.has-entry');
+      if (!t) return;
+      openSidePanel(byDateGlobal[t.dataset.date], t);
+    });
+  })();
+
+  // ---------- Side panel ----------
+  var sidePanel = document.getElementById('sidePanel');
+  var scrim = document.getElementById('scrim');
+  var spActive = null;
+  function openSidePanel(entry, sourceEl) {
+    if (!entry) return;
+    document.querySelectorAll('.mc.active').forEach(function (n) { n.classList.remove('active'); });
+    if (sourceEl) sourceEl.classList.add('active');
+    spActive = sourceEl;
+
+    var accentName = entry.accent && entry.accent.name ? entry.accent.name : '—';
+    var accentHex = entry.accent && entry.accent.hex ? entry.accent.hex : '#7a7a7a';
+    document.getElementById('spMeta').innerHTML =
+      escapeHTML((entry.weekday || '').toUpperCase()) + ' · ' + escapeHTML(entry.date) +
+      ' · <span class="sp-accent-dot" style="background:' + escapeHTML(accentHex) + '"></span>' +
+      escapeHTML(accentName);
+    document.getElementById('spTitle').textContent = oneliner(entry);
+
+    var body = document.getElementById('spBody');
+    body.innerHTML = '';
+    (entry.questions || []).forEach(function (q) { body.appendChild(renderQRow(q)); });
+    if (entry.english_notes && entry.english_notes.length) {
+      body.appendChild(renderEnglishBlock(entry.english_notes));
+    }
+
+    sidePanel.classList.add('open');
+    sidePanel.setAttribute('aria-hidden', 'false');
+    scrim.classList.add('open');
+  }
+  function closeSidePanel() {
+    sidePanel.classList.remove('open');
+    sidePanel.setAttribute('aria-hidden', 'true');
+    scrim.classList.remove('open');
+    if (spActive) spActive.classList.remove('active');
+    spActive = null;
+  }
+  scrim.addEventListener('click', closeSidePanel);
+  document.getElementById('spClose').addEventListener('click', closeSidePanel);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeSidePanel();
+  });
+
+  // ---------- 10. renderQRow — tokens-flavored ----------
+  function isEmpty(q) {
+    if (q.value == null || q.value === '') return true;
+    if (Array.isArray(q.value) && !q.value.length) return true;
+    if (typeof q.value === 'object' && !Array.isArray(q.value)) {
+      return !Object.values(q.value).some(function (v) { return v && String(v).trim(); });
+    }
+    return false;
+  }
+  function renderQRow(q) {
+    var row = document.createElement('div');
+    row.className = 'q';
+    var label = document.createElement('div');
+    label.className = 'q-label';
+    label.textContent = (q.label || q.id || 'question');
+    row.appendChild(label);
+
+    var val = document.createElement('div');
+    val.className = 'q-value';
+
+    if (isEmpty(q)) {
+      val.className += ' empty';
+      val.textContent = '// skipped';
+      row.appendChild(val);
+      return row;
+    }
+
+    var t = q.type;
+    if (t === 'slider') {
+      var min = (typeof q.min === 'number') ? q.min : 0;
+      var max = (typeof q.max === 'number') ? q.max : 10;
+      var v = Number(q.value);
+      var pct = Math.max(0, Math.min(1, (v - min) / (max - min || 1)));
+      var fillX = 140 * pct;
+      val.innerHTML =
+        '<div class="q-bar-row">' +
+          '<svg class="q-bar-svg" viewBox="0 0 140 4" preserveAspectRatio="none" aria-hidden="true">' +
+            '<line class="rail" x1="0" y1="2" x2="140" y2="2"></line>' +
+            '<line class="fill" x1="0" y1="2" x2="' + fillX.toFixed(1) + '" y2="2"></line>' +
+          '</svg>' +
+          '<span class="q-value-mono">' + escapeHTML(String(v)) + '<span class="denom">/ ' + escapeHTML(String(max)) + '</span></span>' +
+        '</div>';
+    } else if (t === 'emoji') {
+      val.innerHTML = '<span class="q-emoji">' + escapeHTML(q.value) + '</span>';
+    } else if (t === 'tags') {
+      var tags = Array.isArray(q.value) ? q.value : [];
+      val.innerHTML = '<div class="q-tags">' +
+        tags.map(function (x) { return '<span class="tag">' + escapeHTML(x) + '</span>'; }).join('') +
+        '</div>';
+    } else if (t === 'choice') {
+      val.innerHTML = '<span class="chip">' + escapeHTML(q.value) + '</span>';
+    } else if (t === 'stars') {
+      var max2 = (typeof q.max === 'number') ? q.max : 5;
+      var lit = Math.max(0, Math.min(max2, Number(q.value) || 0));
+      var stars = '';
+      for (var i = 0; i < max2; i++) {
+        stars += '<span class="s' + (i < lit ? ' lit' : '') + '">' + (i < lit ? '★' : '☆') + '</span>';
+      }
+      val.innerHTML = '<span class="q-stars">' + stars + '</span>';
+    } else if (t === 'color') {
+      val.innerHTML =
+        '<span class="q-color-row">' +
+          '<span class="q-color-sw" style="background:' + escapeHTML(q.value) + '"></span>' +
+          '<span class="q-color-hex">' + escapeHTML(q.value) + '</span>' +
+        '</span>';
+    } else if (t === 'number') {
+      val.innerHTML = '<span class="q-value-mono">' + escapeHTML(String(q.value)) + '</span>';
+    } else if (t === 'timeline') {
+      var segs = q.segments || ['morning','afternoon','evening'];
+      var rows = segs.map(function (k) {
+        var text = q.value && q.value[k];
+        return '<div class="seg"><div class="seg-l">' + escapeHTML(k) + '</div>' +
+          '<div class="seg-v' + (text ? '' : ' empty') + '">' + (text ? escapeHTML(text) : '—') + '</div></div>';
+      }).join('');
+      val.innerHTML = '<div class="q-timeline">' + rows + '</div>';
+    } else {
+      val.className = 'q-value q-value-sans';
+      val.textContent = String(q.value);
+    }
+    row.appendChild(val);
+    return row;
+  }
+
+  function renderEnglishBlock(notes) {
+    var div = document.createElement('div');
+    div.className = 'feedback-block';
+    var h3 = document.createElement('h3');
+    h3.textContent = 'english upgrades';
+    div.appendChild(h3);
+    notes.forEach(function (n) {
+      var item = document.createElement('div');
+      item.className = 'eng-item';
+      item.innerHTML =
+        '<span class="eng-orig">' + escapeHTML(n.original || '') + '</span>' +
+        '<span class="eng-arrow"> → </span>' +
+        '<span class="eng-upg">' + escapeHTML(n.suggested || '') + '</span>' +
+        (n.note ? '<span class="eng-note">' + escapeHTML(n.note) + '</span>' : '');
+      div.appendChild(item);
+    });
+    return div;
+  }
+
+  // ---------- 15. Mood sparkline ----------
+  var sparkSvg = document.getElementById('sparkSvg');
+  var sparkCaption = document.getElementById('sparkCaption');
+  var currentRange = 90;
+  function renderSpark(range) {
+    currentRange = range;
+    document.querySelectorAll('.spark-tab').forEach(function (t) {
+      t.classList.toggle('active', Number(t.dataset.range) === range);
+    });
+
+    var W = 800, H = 160, pad = { t: 18, r: 6, b: 22, l: 26 };
+    var innerW = W - pad.l - pad.r;
+    var innerH = H - pad.t - pad.b;
+
+    // Build series — one point per calendar day in the range
+    var today = new Date(); today.setHours(0,0,0,0);
+    var byDate = {};
+    entries.forEach(function (e) {
+      var mood = (e.questions || []).find(function (q) { return q.id === 'mood' && typeof q.value === 'number'; });
+      if (mood) byDate[e.date] = mood.value;
+    });
+
+    var points = [];
+    for (var i = range - 1; i >= 0; i--) {
+      var d = new Date(today); d.setDate(today.getDate() - i);
+      var iso = fmtISO(d);
+      points.push({ date: iso, value: (iso in byDate) ? byDate[iso] : null });
+    }
+
+    var withValues = points.filter(function (p) { return p.value != null; });
+    sparkSvg.innerHTML = '';
+
+    // X-axis labels: start, mid, end
+    var xLabels = '';
+    if (points.length) {
+      [0, Math.floor(points.length / 2), points.length - 1].forEach(function (idx, i) {
+        var p = points[idx];
+        var x = pad.l + (points.length === 1 ? 0 : (idx / (points.length - 1)) * innerW);
+        xLabels += '<text class="axis-label" x="' + x + '" y="' + (H - 6) + '" text-anchor="' + (i === 0 ? 'start' : i === 2 ? 'end' : 'middle') + '">' + p.date.slice(5) + '</text>';
+      });
+    }
+
+    // Path (skip gaps — break at nulls)
+    var pathParts = [];
+    var lastWasValid = false;
+    points.forEach(function (p, idx) {
+      if (p.value == null) { lastWasValid = false; return; }
+      var x = pad.l + (points.length === 1 ? 0 : (idx / (points.length - 1)) * innerW);
+      var y = pad.t + innerH - (p.value / 10) * innerH;
+      pathParts.push((lastWasValid ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1));
+      lastWasValid = true;
+    });
+    var pathD = pathParts.join(' ');
+    var pathHtml = pathD ? '<path class="spark-path" d="' + pathD + '"></path>' : '';
+
+    var dots = withValues.map(function (p) {
+      var idx = points.findIndex(function (x) { return x.date === p.date; });
+      var x = pad.l + (points.length === 1 ? 0 : (idx / (points.length - 1)) * innerW);
+      var y = pad.t + innerH - (p.value / 10) * innerH;
+      return '<circle class="spark-dot" data-idx="' + idx + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="2.5"></circle>';
+    }).join('');
+
+    var cursorLine = '<line class="cursor-line" id="sparkCursor" x1="0" y1="' + pad.t + '" x2="0" y2="' + (pad.t + innerH) + '"></line>';
+    sparkSvg.innerHTML = xLabels + cursorLine + pathHtml + dots;
+
+    if (!withValues.length) {
+      sparkCaption.innerHTML = '<span class="empty">// no mood data in this range</span>';
+    } else {
+      sparkCaption.innerHTML = '<span class="empty">// hover to scrub · ' + withValues.length + ' / ' + range + ' days logged</span>';
+    }
+
+    // Hover scrub
+    sparkSvg.onmousemove = function (ev) {
+      var rect = sparkSvg.getBoundingClientRect();
+      var vbx = ((ev.clientX - rect.left) / rect.width) * W;
+      var rel = Math.max(0, Math.min(1, (vbx - pad.l) / innerW));
+      var idx = Math.round(rel * (points.length - 1));
+      var p = points[idx];
+      var x = pad.l + (points.length === 1 ? 0 : (idx / (points.length - 1)) * innerW);
+      var cursor = document.getElementById('sparkCursor');
+      if (cursor) { cursor.setAttribute('x1', x); cursor.setAttribute('x2', x); cursor.classList.add('on'); }
+      document.querySelectorAll('.spark-dot').forEach(function (n) {
+        n.classList.toggle('on', Number(n.dataset.idx) === idx);
+      });
+      if (p.value == null) {
+        sparkCaption.innerHTML = '<span>' + p.date + '</span> · <span class="empty">no entry</span>';
+      } else {
+        sparkCaption.innerHTML = '<span>' + p.date + '</span> · mood <span class="v">' + p.value + '</span> / 10';
+      }
+    };
+    sparkSvg.onmouseleave = function () {
+      var cursor = document.getElementById('sparkCursor');
+      if (cursor) cursor.classList.remove('on');
+      document.querySelectorAll('.spark-dot').forEach(function (n) { n.classList.remove('on'); });
+      if (!withValues.length) {
+        sparkCaption.innerHTML = '<span class="empty">// no mood data in this range</span>';
+      } else {
+        sparkCaption.innerHTML = '<span class="empty">// hover to scrub · ' + withValues.length + ' / ' + range + ' days logged</span>';
+      }
+    };
+  }
+  document.querySelectorAll('.spark-tab').forEach(function (btn) {
+    btn.addEventListener('click', function () { renderSpark(Number(btn.dataset.range)); });
+  });
+  renderSpark(currentRange);
+
+  // ---------- 16. Tag cloud ----------
+  var tagCloudEl = document.getElementById('tagCloud');
+  var tagFreq = {};
+  entries.forEach(function (e) {
+    (e.questions || []).forEach(function (q) {
+      if (q.type === 'tags' && Array.isArray(q.value)) {
+        q.value.forEach(function (t) {
+          var k = String(t).trim().toLowerCase();
+          if (!k) return;
+          tagFreq[k] = (tagFreq[k] || 0) + 1;
+        });
+      }
+    });
+  });
+  var tagList = Object.keys(tagFreq).map(function (k) { return { tag: k, n: tagFreq[k] }; })
+    .sort(function (a, b) { return b.n - a.n; });
+
+  function renderTagCloud(activeTag) {
+    if (!tagList.length) {
+      tagCloudEl.innerHTML = '<span class="tag-cloud-empty">// no tags yet</span>';
+      return;
+    }
+    tagCloudEl.innerHTML = tagList.map(function (t, i) {
+      var size = 11 + Math.min(17, t.n * 1.2);
+      var cls = 'tc';
+      if (i < 3) cls += ' top';
+      if (activeTag === t.tag) cls += ' active';
+      return '<button type="button" class="' + cls + '" data-tag="' + escapeHTML(t.tag) + '" ' +
+        'style="font-size:' + size.toFixed(1) + 'px">' +
+        escapeHTML(t.tag) + '<span class="freq">·' + t.n + '</span>' +
+        '</button>';
+    }).join('');
+    tagCloudEl.querySelectorAll('.tc').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var t = btn.dataset.tag;
+        if (currentFilter.tag === t) {
+          currentFilter.tag = null;
+          updateURLForTag(null);
+        } else {
+          currentFilter.tag = t;
+          updateURLForTag(t);
+        }
+        applyFilter();
+      });
+    });
+  }
+  function updateURLForTag(t) {
+    try {
+      var u = new URL(window.location.href);
+      if (t) u.searchParams.set('tag', t);
+      else u.searchParams.delete('tag');
+      history.replaceState(null, '', u.toString());
+    } catch (e) { /* file:// older URL impl — silent */ }
+  }
+
+  // ---------- 12. Filter + entries list ----------
+  var filterInput = document.getElementById('filterInput');
+  var entriesEl = document.getElementById('entries');
+  var activeFilterEl = document.getElementById('activeFilter');
+  var resultCountEl = document.getElementById('resultCount');
+
+  var currentFilter = { tag: null };
+
+  // Read ?tag= from URL on load
+  (function readURL() {
+    try {
+      var u = new URL(window.location.href);
+      var t = u.searchParams.get('tag');
+      if (t) currentFilter.tag = t.toLowerCase();
+    } catch (e) {}
+  })();
+
+  function parseFilter(s) {
+    var f = { keywords: [], tag: null, accent: null, moodGt: null, moodLt: null };
+    if (!s) return f;
+    var parts = s.match(/\S+/g) || [];
+    parts.forEach(function (p) {
+      var m;
+      if ((m = /^tag:(.+)$/i.exec(p))) f.tag = m[1].toLowerCase();
+      else if ((m = /^accent:(.+)$/i.exec(p))) f.accent = m[1].toLowerCase();
+      else if ((m = /^mood>(\d+(?:\.\d+)?)$/i.exec(p))) f.moodGt = parseFloat(m[1]);
+      else if ((m = /^mood<(\d+(?:\.\d+)?)$/i.exec(p))) f.moodLt = parseFloat(m[1]);
+      else f.keywords.push(p.toLowerCase());
+    });
+    return f;
+  }
+
+  function entryMatches(e, f) {
+    // tag
+    if (f.tag) {
+      var hasTag = (e.questions || []).some(function (q) {
+        return q.type === 'tags' && Array.isArray(q.value)
+          && q.value.some(function (t) { return String(t).toLowerCase() === f.tag; });
+      });
+      if (!hasTag) return false;
+    }
+    // accent
+    if (f.accent) {
+      var name = e.accent && e.accent.name ? String(e.accent.name).toLowerCase() : '';
+      if (name !== f.accent) return false;
+    }
+    // mood
+    if (f.moodGt != null || f.moodLt != null) {
+      var mood = (e.questions || []).find(function (q) { return q.id === 'mood' && typeof q.value === 'number'; });
+      if (!mood) return false;
+      if (f.moodGt != null && !(mood.value > f.moodGt)) return false;
+      if (f.moodLt != null && !(mood.value < f.moodLt)) return false;
+    }
+    // keywords — AND across haystack
+    if (f.keywords.length) {
+      var hay = (e.date + ' ' + (e.weekday || '') + ' ' + (e.accent && e.accent.name || '') + ' ').toLowerCase();
+      (e.questions || []).forEach(function (q) {
+        if (q.value == null) return;
+        if (typeof q.value === 'string') hay += q.value.toLowerCase() + ' ';
+        else if (Array.isArray(q.value)) hay += q.value.join(' ').toLowerCase() + ' ';
+        else if (typeof q.value === 'object') {
+          Object.values(q.value).forEach(function (v) { if (v) hay += String(v).toLowerCase() + ' '; });
+        } else hay += String(q.value).toLowerCase() + ' ';
+        if (q.label) hay += q.label.toLowerCase() + ' ';
+      });
+      (e.english_notes || []).forEach(function (n) {
+        hay += (n.original || '').toLowerCase() + ' ' + (n.suggested || '').toLowerCase() + ' ' + (n.note || '').toLowerCase() + ' ';
+      });
+      for (var i = 0; i < f.keywords.length; i++) {
+        if (hay.indexOf(f.keywords[i]) === -1) return false;
+      }
+    }
+    return true;
+  }
+
+  function combinedFilter() {
+    var f = parseFilter(filterInput.value);
+    // tag click takes precedence if filter input doesn't set tag
+    if (!f.tag && currentFilter.tag) f.tag = currentFilter.tag;
+    return f;
+  }
+
+  function renderEntry(e) {
+    var div = document.createElement('div');
+    div.className = 'entry';
+    div.id = 'entry-' + e.date;
+
+    var accentName = e.accent && e.accent.name ? e.accent.name : '—';
+    var accentHex = e.accent && e.accent.hex ? e.accent.hex : '#7a7a7a';
+
+    var head = document.createElement('div');
+    head.className = 'entry-head';
+    head.innerHTML =
+      '<div class="entry-date">' + escapeHTML(e.weekday || '') + ', ' + escapeHTML(e.date) + '</div>' +
+      '<div class="entry-meta">' +
+        '<span class="entry-accent-dot" style="background:' + escapeHTML(accentHex) + '"></span>' +
+        escapeHTML(accentName) +
+      '</div>';
+    div.appendChild(head);
+
+    (e.questions || []).forEach(function (q) { div.appendChild(renderQRow(q)); });
+
+    if (e.english_notes && e.english_notes.length) {
+      div.appendChild(renderEnglishBlock(e.english_notes));
+    }
+    return div;
+  }
+
+  function applyFilter() {
+    var f = combinedFilter();
+    var matched = entries.filter(function (e) { return entryMatches(e, f); });
+
+    // Active filter badge
+    var parts = [];
+    if (f.tag) parts.push('tag:' + f.tag);
+    if (f.accent) parts.push('accent:' + f.accent);
+    if (f.moodGt != null) parts.push('mood>' + f.moodGt);
+    if (f.moodLt != null) parts.push('mood<' + f.moodLt);
+    if (f.keywords.length) parts.push('"' + f.keywords.join(' ') + '"');
+    if (parts.length) {
+      activeFilterEl.hidden = false;
+      activeFilterEl.innerHTML = '// active: ' + escapeHTML(parts.join(' · ')) +
+        '<button type="button" class="clear">clear</button>';
+      activeFilterEl.querySelector('.clear').addEventListener('click', function () {
+        filterInput.value = '';
+        currentFilter.tag = null;
+        updateURLForTag(null);
+        renderTagCloud(null);
+        applyFilter();
+      });
+    } else {
+      activeFilterEl.hidden = true;
+      activeFilterEl.innerHTML = '';
+    }
+
+    // Reflect active filter in tag cloud
+    renderTagCloud(f.tag);
+
+    // Result count
+    if (!entries.length) {
+      resultCountEl.textContent = '';
+    } else {
+      resultCountEl.textContent = matched.length + ' / ' + entries.length + ' entries';
+    }
+
+    // Render entries
+    entriesEl.innerHTML = '';
+    if (!entries.length) {
+      var empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = '// no entries yet — open today.html and write something';
+      entriesEl.appendChild(empty);
+      return;
+    }
+    if (!matched.length) {
+      var none = document.createElement('div');
+      none.className = 'empty-state';
+      none.textContent = '// 0 entries match this filter';
+      entriesEl.appendChild(none);
+      return;
+    }
+    matched.forEach(function (e) { entriesEl.appendChild(renderEntry(e)); });
+  }
+
+  // Debounce filter typing
+  var filterTimer = null;
+  filterInput.addEventListener('input', function () {
+    clearTimeout(filterTimer);
+    filterTimer = setTimeout(applyFilter, 80);
+  });
+
+  // First render
+  renderTagCloud(currentFilter.tag);
+  applyFilter();
+  }
+
+  function loadArchiveFromServer() {
+    if (typeof fetch !== 'function') {
+      renderArchive();
+      return;
+    }
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = setTimeout(function () {
+      if (controller) controller.abort();
+    }, 2500);
+    fetch('http://localhost:5757/api/journal/archive?limit=365', {
+      signal: controller ? controller.signal : undefined
+    }).then(function (resp) {
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      return resp.json();
+    }).then(function (data) {
+      if (Array.isArray(data)) entries = data;
+      renderArchive();
+    }).catch(function () {
+      clearTimeout(timer);
+      renderArchive();
+    });
+  }
+
+  loadArchiveFromServer();
+
+  // <!-- TODO: patterns-data is loaded above (`patterns`) but not yet rendered;
+  //      english.html owns the patterns view. Reserved here so the data block
+  //      exists for cross-entry tag patterns when needed. -->
+
+})();
+</script>
+
+</body>
+</html>

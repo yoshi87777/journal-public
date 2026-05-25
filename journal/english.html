@@ -1,0 +1,1251 @@
+<!doctype html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>english — life-os</title>
+<link rel="stylesheet" href="_tokens.css">
+<style>
+  /* Page-local styles — uses tokens from _tokens.css; no literal hex codes. */
+
+  .lead {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: var(--lh-body);
+    max-width: 540px;
+    margin: 0 0 36px;
+    font-family: var(--font-mono);
+  }
+
+  /* Theme toggle — bottom-right floating affordance. */
+  .theme-toggle {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border-2);
+    background: var(--bg);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: var(--r-1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--t-fast) var(--ease);
+    z-index: 10;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Patterns section */
+  .patterns { margin: 0 0 48px; padding: 0; }
+  .patterns-head {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 18px;
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+  .patterns-head .count-meta { color: var(--muted-2); }
+  .patterns-list { display: flex; flex-direction: column; gap: 10px; }
+  .pattern-row {
+    border-top: 1px solid var(--border);
+    padding: 12px 0 0;
+  }
+  .pattern-row:first-child { border-top: 0; padding-top: 0; }
+  .pattern-bar-line {
+    display: grid;
+    grid-template-columns: 1fr 32px;
+    align-items: center;
+    gap: 12px;
+  }
+  .pattern-name {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--fg);
+    letter-spacing: var(--tight);
+  }
+  .pattern-count {
+    font-family: var(--font-mono);
+    font-feature-settings: "tnum";
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+  }
+  .pattern-bar-svg {
+    display: block;
+    width: 100%;
+    height: 4px;
+    margin-top: 6px;
+  }
+  .pattern-advice {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+    line-height: var(--lh-body);
+    max-width: 560px;
+  }
+
+  /* Days */
+  .days { display: flex; flex-direction: column; }
+  .day {
+    padding: 22px 0 8px;
+    border-top: 1px solid var(--border);
+  }
+  .day:first-child { border-top: 0; padding-top: 0; }
+  .day-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+  }
+  .day-date { color: var(--fg); }
+  .day-date .sep { color: var(--muted-2); margin: 0 8px; }
+  .day-count { color: var(--muted); }
+
+  /* eng-item — vertical stack layout. Overrides the default .eng-item from
+     _tokens.css (which is 10px padding, inline diff). Here we space it
+     generously so each upgrade reads top-down without ping-ponging. */
+  .eng-item {
+    padding: 18px 0;
+    border-top: 1px solid var(--border);
+    font-size: 15px;
+    line-height: var(--lh-body);
+  }
+  .eng-item:first-child { border-top: 0; }
+
+  .eng-item-meta {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    flex-wrap: wrap;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .eng-context {
+    color: var(--muted-2);
+    overflow-wrap: anywhere;
+  }
+  .eng-context-sep { color: var(--muted-2); }
+  .kind-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .eng-orig-row,
+  .eng-upg-row {
+    display: grid;
+    grid-template-columns: 50px 1fr;
+    gap: 12px;
+    align-items: baseline;
+    margin-bottom: 6px;
+  }
+  .eng-orig-label,
+  .eng-upg-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .eng-upg-label { color: var(--accent); }
+  .eng-orig {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--muted-2);
+    overflow-wrap: anywhere;
+  }
+  .eng-upg {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    color: var(--fg);
+    border-bottom: 1px solid var(--accent);
+    overflow-wrap: anywhere;
+    transition: text-shadow var(--t-base) var(--ease);
+  }
+  .eng-item:hover .eng-upg {
+    text-shadow: 0 0 12px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  .eng-note {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.55;
+    margin-top: 8px;
+    margin-left: 62px;
+    font-style: normal;
+  }
+
+  /* Empty state */
+  .empty {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    padding: 32px 0;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ===================================================================== */
+  /* Analysis sections — native_moves / drift_map / register_check / vocab */
+  /* ===================================================================== */
+
+  .analysis-block {
+    margin: 0 0 48px;
+  }
+  .analysis-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin: 0 0 16px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .analysis-head .cache-stamp { color: var(--muted-2); }
+  .analysis-head .refresh-all {
+    color: var(--muted);
+    background: transparent;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    transition: color var(--t-fast) var(--ease);
+  }
+  .analysis-head .refresh-all:hover { color: var(--accent); }
+  .analysis-head .refresh-all .star { color: var(--accent); margin-right: 4px; }
+
+  .analysis-sections { display: flex; flex-direction: column; }
+
+  .section {
+    border-top: 1px solid var(--border);
+  }
+  .section:first-child { border-top: 0; }
+  .section-toggle {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    padding: 16px 0;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--fg);
+    text-align: left;
+    transition: color var(--t-fast) var(--ease);
+  }
+  .section-toggle:hover { color: var(--accent); }
+  .section-toggle:hover .section-chevron { color: var(--accent); }
+  .section-name { flex: 0 0 auto; }
+  .section-meta {
+    flex: 1 1 auto;
+    color: var(--muted-2);
+    font-size: 10px;
+  }
+  .section-chevron {
+    color: var(--muted);
+    transition: transform var(--t-base) var(--ease), color var(--t-fast) var(--ease);
+    display: inline-block;
+  }
+  .section.open .section-chevron { transform: rotate(90deg); }
+  .section-body {
+    padding: 4px 0 24px;
+  }
+  .section:not(.open) .section-body { display: none; }
+  .section-refresh {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--tight);
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--border-2);
+    padding: 8px 14px;
+    cursor: pointer;
+    border-radius: var(--r-1);
+    transition: all var(--t-base) var(--ease);
+  }
+  .section-refresh:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .section-refresh:disabled { opacity: 0.5; cursor: wait; }
+  .section-status {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--wide);
+    color: var(--muted);
+    margin-top: 10px;
+  }
+  .section-empty {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    padding: 8px 0;
+  }
+
+  /* native moves */
+  .nm-bucket { margin-bottom: 22px; }
+  .nm-bucket:last-child { margin-bottom: 0; }
+  .nm-bucket-head {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .nm-row {
+    display: grid;
+    grid-template-columns: max-content 1fr auto;
+    gap: 12px;
+    align-items: baseline;
+    padding: 6px 0;
+    border-top: 1px solid var(--border);
+  }
+  .nm-row:first-of-type { border-top: 0; }
+  .nm-form {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--fg);
+  }
+  .nm-example {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    color: var(--fg);
+    overflow-wrap: anywhere;
+  }
+  .nm-when {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--wide);
+    color: var(--muted);
+    text-align: right;
+    white-space: nowrap;
+  }
+  @media (max-width: 560px) {
+    .nm-row { grid-template-columns: 1fr; gap: 4px; }
+    .nm-when { text-align: left; }
+  }
+
+  /* drift map */
+  .dm-row {
+    display: grid;
+    grid-template-columns: 200px 1fr auto;
+    gap: 14px;
+    align-items: center;
+    padding: 4px 0;
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    border-bottom: 0;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+  }
+  .dm-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--fg);
+  }
+  .dm-bar {
+    height: 4px;
+    background: var(--border-2);
+    border-radius: var(--r-1);
+    position: relative;
+    overflow: hidden;
+  }
+  .dm-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: inherit;
+    transition: width var(--t-base) var(--ease);
+  }
+  .dm-count {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    font-feature-settings: "tnum";
+    text-align: right;
+    min-width: 32px;
+  }
+  .dm-detail {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: var(--lh-body);
+    padding: 6px 0 10px 0;
+    max-width: 560px;
+    overflow-wrap: anywhere;
+  }
+  .dm-item:not(.open) .dm-detail { display: none; }
+  @media (max-width: 560px) {
+    .dm-row { grid-template-columns: 1fr 1fr auto; }
+    .dm-label { grid-column: 1 / -1; }
+  }
+
+  /* register check */
+  .rc-row {
+    display: grid;
+    grid-template-columns: 110px 100px 1fr;
+    gap: 14px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    align-items: baseline;
+    background: transparent;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .rc-item:first-child .rc-row { border-top: 0; }
+  .rc-date {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: var(--wide);
+  }
+  .rc-dominant {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--wide);
+  }
+  .rc-dominant.dom-business,
+  .rc-dominant.dom-casual,
+  .rc-dominant.dom-academic { color: var(--fg); }
+  .rc-dominant.dom-mixed { color: var(--accent); }
+  .rc-dominant.dom-neutral { color: var(--muted); }
+  .rc-verdict {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    color: var(--fg);
+    overflow-wrap: anywhere;
+  }
+  .rc-slips {
+    padding: 4px 0 10px 110px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .rc-item:not(.open) .rc-slips { display: none; }
+  .rc-slip {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+  .rc-slip .arrow { color: var(--muted-2); margin: 0 6px; }
+  .rc-row[disabled] { cursor: default; }
+  @media (max-width: 560px) {
+    .rc-row { grid-template-columns: 1fr 1fr; }
+    .rc-verdict { grid-column: 1 / -1; }
+    .rc-slips { padding-left: 0; }
+  }
+
+  /* vocabulary */
+  .vocab-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+  }
+  @media (max-width: 720px) {
+    .vocab-grid { grid-template-columns: 1fr; }
+  }
+  .vocab-col-head {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--wide);
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .vocab-row {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 12px;
+    padding: 5px 0;
+    border-top: 1px solid var(--border);
+    align-items: baseline;
+  }
+  .vocab-col > .vocab-row:first-of-type { border-top: 0; }
+  .vocab-term {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--fg);
+  }
+  .vocab-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted-2);
+    font-feature-settings: "tnum";
+    text-align: right;
+  }
+
+  /* prefers-reduced-motion: snap, no transitions */
+  @media (prefers-reduced-motion: reduce) {
+    .section-chevron,
+    .dm-bar-fill,
+    .eng-upg,
+    .section-toggle,
+    .section-refresh,
+    .analysis-head .refresh-all {
+      transition: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="status" id="status"></div>
+
+  <h1 class="page-title">english<span class="dot">.</span></h1>
+
+  <nav class="nav">
+    <a href="today.html">&rarr; today</a>
+    <a href="archive.html">&rarr; archive</a>
+    <a class="current" aria-current="page" href="english.html">english</a>
+  </nav>
+
+  <p class="lead">// small upgrades, picked from what you actually wrote. skim this between things.</p>
+
+  <section id="patterns" class="patterns" hidden></section>
+
+  <section id="analysis" class="analysis-block">
+    <div class="analysis-head">
+      <span>// deeper analysis</span>
+      <span class="cache-stamp" id="analysis-stamp"></span>
+      <button type="button" class="refresh-all" id="refresh-all">
+        [ <span class="star">&#10022;</span>refresh all sections ]
+      </button>
+    </div>
+    <div class="analysis-sections">
+      <div class="section" data-section="native_moves">
+        <button type="button" class="section-toggle" aria-expanded="false">
+          <span class="section-name">// native moves to steal</span>
+          <span class="section-meta"></span>
+          <span class="section-chevron" aria-hidden="true">&#9656;</span>
+        </button>
+        <div class="section-body" data-body="native_moves"></div>
+      </div>
+      <div class="section" data-section="drift_map">
+        <button type="button" class="section-toggle" aria-expanded="false">
+          <span class="section-name">// where you leak</span>
+          <span class="section-meta"></span>
+          <span class="section-chevron" aria-hidden="true">&#9656;</span>
+        </button>
+        <div class="section-body" data-body="drift_map"></div>
+      </div>
+      <div class="section" data-section="register_check">
+        <button type="button" class="section-toggle" aria-expanded="false">
+          <span class="section-name">// register check</span>
+          <span class="section-meta"></span>
+          <span class="section-chevron" aria-hidden="true">&#9656;</span>
+        </button>
+        <div class="section-body" data-body="register_check"></div>
+      </div>
+      <div class="section" data-section="vocabulary">
+        <button type="button" class="section-toggle" aria-expanded="false">
+          <span class="section-name">// vocab in flight</span>
+          <span class="section-meta"></span>
+          <span class="section-chevron" aria-hidden="true">&#9656;</span>
+        </button>
+        <div class="section-body" data-body="vocabulary"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="days" class="days"></section>
+
+  <div class="path-crumb">~/life-os/journal/english.html</div>
+</div>
+
+<button class="theme-toggle" id="theme-toggle" title="toggle theme" aria-label="toggle theme">[☾]</button>
+
+<!-- Data: Claude appends to these when entries are saved. -->
+<script id="english-data" type="application/json">
+[
+  {
+    "date": "2026-05-13",
+    "weekday": "Tuesday",
+    "items": [
+      {
+        "original": "I have been busy these days and could not catch up with the model.",
+        "suggested": "I've barely surfaced lately — couldn't catch up with the model.",
+        "note": "'barely surfaced' is a richer native idiom for sustained overload than 'busy these days'. The dash mid-sentence is how a native varies rhythm without splitting into two short ones.",
+        "context": "from longtext 'free'",
+        "kind": "idiom"
+      },
+      {
+        "original": "I want to discuss this with the team tomorrow.",
+        "suggested": "I'd like to flag this with the team tomorrow.",
+        "note": "'flag' is the standard business-register verb here — softer than 'discuss', signals 'raise for attention'. Native US office register.",
+        "kind": "word-choice"
+      },
+      {
+        "original": "I am anxious for the presentation tomorrow.",
+        "suggested": "I'm anxious about the presentation tomorrow.",
+        "note": "'anxious for' = eager / looking forward (positive). 'anxious about' = nervous (negative). The preposition flips the meaning entirely. Common L2 slip.",
+        "kind": "word-choice"
+      }
+    ]
+  },
+  {
+    "date": "2026-05-12",
+    "weekday": "Monday",
+    "items": [
+      {
+        "original": "Let me know your thoughts on this.",
+        "suggested": "Curious what you make of it.",
+        "note": "Slightly warmer + more native register than the slack-y default. 'what you make of it' is a phrase Americans use often where a non-native would say 'your thoughts'.",
+        "kind": "register"
+      },
+      {
+        "original": "In order to understand the problem, I read the paper twice.",
+        "suggested": "To make sense of the problem, I read the paper twice.",
+        "note": "'in order to' → 'to' (wordiness). 'understand' → 'make sense of' (the latter is the collocation natives reach for in casual analytical writing).",
+        "kind": "idiom"
+      }
+    ]
+  }
+]
+</script>
+
+<script id="patterns-data" type="application/json">
+[
+  { "pattern": "preposition slips", "advice": "'anxious for/about', 'different than/from', 'concerned of/about', 'curious for/about' — the wrong preposition can flip the meaning. Slow down on these.", "count": 6 },
+  { "pattern": "L2 wordiness", "advice": "'in order to' → 'to'; 'in spite of the fact that' → 'even though'; 'I have a question to ask' → 'I have a question'. Trim the scaffolding.", "count": 5 },
+  { "pattern": "register mixing", "advice": "Within the same sentence you sometimes shift between business ('discuss', 'address') and casual ('hang out', 'cool'). Pick one register and hold it.", "count": 4 },
+  { "pattern": "missed phrasal verbs", "advice": "'I will give him this information' → 'I'll fill him in'. 'I will tell the team about this' → 'I'll loop the team in'. Phrasal verbs are the most native-coded grammar move.", "count": 3 },
+  { "pattern": "really + adjective", "advice": "Drop 'really' and pick a sharper adjective: 'really happy' to 'thrilled', 'really hard' to 'brutal'.", "count": 2 }
+]
+</script>
+
+<script src="_accent.js"></script>
+<script>
+(function () {
+  // --- accent + status line ----------------------------------------------
+  lifeOs.applyAccent();
+  lifeOs.mountStatusLine(document.getElementById('status'), { page: 'ENGLISH', version: 'v0.1' });
+
+  // --- theme toggle (persist) --------------------------------------------
+  const THEME_KEY = 'lifeOs.theme';
+  const html = document.documentElement;
+  let stored = null;
+  try { stored = localStorage.getItem(THEME_KEY); } catch (_) {}
+  if (stored === 'light') { html.classList.remove('dark'); html.classList.add('light'); }
+  else { html.classList.add('dark'); html.classList.remove('light'); }
+
+  const themeBtn = document.getElementById('theme-toggle');
+  function paintThemeToggle() {
+    themeBtn.textContent = html.classList.contains('dark') ? '[☾]' : '[☼]';
+  }
+  paintThemeToggle();
+  themeBtn.addEventListener('click', function () {
+    const isLight = html.classList.contains('light');
+    html.classList.toggle('light', !isLight);
+    html.classList.toggle('dark', isLight);
+    try { localStorage.setItem(THEME_KEY, isLight ? 'dark' : 'light'); } catch (_) {}
+    paintThemeToggle();
+  });
+
+  // --- data parsing -------------------------------------------------------
+  function safeJSON(id) {
+    const el = document.getElementById(id);
+    if (!el) return [];
+    const raw = (el.textContent || '').trim();
+    if (!raw) return [];
+    try {
+      const v = JSON.parse(raw);
+      return Array.isArray(v) ? v : [];
+    } catch (e) {
+      console.warn('[english] bad JSON in', id, e);
+      return [];
+    }
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  const days = safeJSON('english-data');
+  const patterns = safeJSON('patterns-data');
+
+  // --- patterns lane ------------------------------------------------------
+  const patternsEl = document.getElementById('patterns');
+  if (patterns.length) {
+    const sorted = patterns.slice().sort(function (a, b) {
+      return (b.count || 0) - (a.count || 0);
+    });
+    const maxCount = Math.max.apply(null, sorted.map(function (p) { return p.count || 0; })) || 1;
+
+    const rowsHtml = sorted.map(function (p) {
+      const name = esc(p.pattern || '');
+      const advice = esc(p.advice || '');
+      const count = Number(p.count || 0);
+      const widthPct = Math.max(2, Math.round((count / maxCount) * 100));
+      return (
+        '<div class="pattern-row">' +
+          '<div class="pattern-bar-line">' +
+            '<div class="pattern-name">' + name + '</div>' +
+            '<div class="pattern-count">' + count + '</div>' +
+          '</div>' +
+          '<svg class="pattern-bar-svg" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true">' +
+            '<rect x="0" y="0" width="100" height="4" fill="currentColor" opacity="0.08"></rect>' +
+            '<rect x="0" y="0" width="' + widthPct + '" height="4" fill="var(--accent)"></rect>' +
+          '</svg>' +
+          (advice ? '<div class="pattern-advice">' + advice + '</div>' : '') +
+        '</div>'
+      );
+    }).join('');
+
+    patternsEl.hidden = false;
+    patternsEl.innerHTML =
+      '<div class="patterns-head">' +
+        '<span>recurring patterns</span>' +
+        '<span class="count-meta">// ' + sorted.length + ' tracked</span>' +
+      '</div>' +
+      '<div class="patterns-list">' + rowsHtml + '</div>';
+  }
+
+  // --- analysis sections --------------------------------------------------
+  const ANALYSIS_CACHE_KEY = 'lifeOs.english.analysis';
+  const ANALYSIS_STATE_KEY = 'lifeOs.english.sections';
+  const ANALYSIS_ENDPOINT  = 'http://localhost:5757/api/english/analysis';
+  const SECTION_KEYS = ['native_moves', 'drift_map', 'register_check', 'vocabulary'];
+
+  function readJSONLS(key, fallback) {
+    try {
+      const v = localStorage.getItem(key);
+      if (!v) return fallback;
+      const parsed = JSON.parse(v);
+      return parsed == null ? fallback : parsed;
+    } catch (_) { return fallback; }
+  }
+  function writeJSONLS(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (_) {}
+  }
+
+  function formatHHMM(iso) {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      return h + ':' + m;
+    } catch (_) { return ''; }
+  }
+
+  function renderNativeMoves(data) {
+    if (!data || typeof data !== 'object') {
+      return '<div class="section-empty">// no native moves yet.</div>';
+    }
+    const buckets = [
+      { key: 'phrasal_verbs',     label: 'phrasal verbs' },
+      { key: 'preposition_pairs', label: 'preposition pairs' },
+      { key: 'register_moves',    label: 'register moves' },
+      { key: 'idioms',            label: 'idioms (alive)' }
+    ];
+    const html = buckets.map(function (b) {
+      const arr = Array.isArray(data[b.key]) ? data[b.key] : [];
+      if (!arr.length) return '';
+      const rows = arr.map(function (it) {
+        if (b.key === 'phrasal_verbs') {
+          return (
+            '<div class="nm-row">' +
+              '<span class="nm-form">' + esc(it.form || '') + '</span>' +
+              '<span class="nm-example">&mdash; ' + esc(it.example || '') + '</span>' +
+              '<span class="nm-when">' + esc(it.when || '') + '</span>' +
+            '</div>'
+          );
+        }
+        if (b.key === 'preposition_pairs') {
+          return (
+            '<div class="nm-row">' +
+              '<span class="nm-form">' + esc(it.pair || '') + '</span>' +
+              '<span class="nm-example">&mdash; ' + esc(it.note || '') + '</span>' +
+              '<span class="nm-when"></span>' +
+            '</div>'
+          );
+        }
+        if (b.key === 'register_moves') {
+          const arrow = '<span style="color:var(--muted-2);margin:0 6px;">&rarr;</span>';
+          return (
+            '<div class="nm-row">' +
+              '<span class="nm-form">' + esc(it.from || '') + arrow + esc(it.to || '') + '</span>' +
+              '<span class="nm-example">&mdash; ' + esc(it.note || '') + '</span>' +
+              '<span class="nm-when"></span>' +
+            '</div>'
+          );
+        }
+        // idioms
+        return (
+          '<div class="nm-row">' +
+            '<span class="nm-form">' + esc(it.idiom || '') + '</span>' +
+            '<span class="nm-example">&mdash; ' + esc(it.gloss || '') + '</span>' +
+            '<span class="nm-when"></span>' +
+          '</div>'
+        );
+      }).join('');
+      return (
+        '<div class="nm-bucket">' +
+          '<div class="nm-bucket-head">' + esc(b.label) + '</div>' +
+          rows +
+        '</div>'
+      );
+    }).join('');
+    return html || '<div class="section-empty">// no native moves yet.</div>';
+  }
+
+  function renderDriftMap(data) {
+    if (!data || !Array.isArray(data.patterns) || !data.patterns.length) {
+      return '<div class="section-empty">// no drift detected yet.</div>';
+    }
+    const sorted = data.patterns.slice().sort(function (a, b) {
+      return (b.count || 0) - (a.count || 0);
+    });
+    const max = Math.max.apply(null, sorted.map(function (p) { return p.count || 0; })) || 1;
+    return sorted.map(function (p, i) {
+      const pct = Math.max(2, Math.round(((p.count || 0) / max) * 100));
+      const hasNote = !!(p.note && String(p.note).trim());
+      return (
+        '<div class="dm-item" data-i="' + i + '">' +
+          '<button type="button" class="dm-row" aria-expanded="false"' + (hasNote ? '' : ' disabled') + '>' +
+            '<span class="dm-label">' + esc(p.pattern || '') + '</span>' +
+            '<span class="dm-bar"><span class="dm-bar-fill" style="width:' + pct + '%"></span></span>' +
+            '<span class="dm-count">' + Number(p.count || 0) + '&times;</span>' +
+          '</button>' +
+          (hasNote ? '<div class="dm-detail">' + esc(p.note) + '</div>' : '') +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function renderRegisterCheck(data) {
+    if (!data || !Array.isArray(data.entries) || !data.entries.length) {
+      return '<div class="section-empty">// no register reads yet.</div>';
+    }
+    return data.entries.map(function (e, i) {
+      const slips = Array.isArray(e.slips) ? e.slips : [];
+      const hasSlips = slips.length > 0;
+      const dom = (e.dominant || 'neutral').toLowerCase();
+      const slipHtml = hasSlips
+        ? ('<div class="rc-slips">' + slips.map(function (s) {
+            return (
+              '<div class="rc-slip">' +
+                '&ldquo;' + esc(s.phrase || '') + '&rdquo;' +
+                '<span class="arrow">&rarr;</span>' +
+                esc(s.issue || '') +
+              '</div>'
+            );
+          }).join('') + '</div>')
+        : '';
+      return (
+        '<div class="rc-item" data-i="' + i + '">' +
+          '<button type="button" class="rc-row" aria-expanded="false"' + (hasSlips ? '' : ' disabled') + '>' +
+            '<span class="rc-date">' + esc(e.date || '') + '</span>' +
+            '<span class="rc-dominant dom-' + esc(dom) + '">' + esc(dom) + '</span>' +
+            '<span class="rc-verdict">' + esc(e.verdict || '') + '</span>' +
+          '</button>' +
+          slipHtml +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function renderVocabulary(data) {
+    if (!data || (!Array.isArray(data.absorbed) && !Array.isArray(data.pending))) {
+      return '<div class="section-empty">// no vocab tracked yet.</div>';
+    }
+    const absorbed = Array.isArray(data.absorbed) ? data.absorbed : [];
+    const pending  = Array.isArray(data.pending)  ? data.pending  : [];
+
+    function absRow(v) {
+      const bits = [];
+      if (v.used_count) bits.push(v.used_count + '×');
+      if (v.first_seen) bits.push('since ' + v.first_seen);
+      const meta = bits.length ? '(' + bits.join(', ') + ')' : '';
+      return (
+        '<div class="vocab-row">' +
+          '<span class="vocab-term">' + esc(v.term || '') + '</span>' +
+          '<span class="vocab-meta">' + esc(meta) + '</span>' +
+        '</div>'
+      );
+    }
+    function pendRow(v) {
+      const meta = v.suggested_at ? '(suggested ' + v.suggested_at + ')' : '';
+      return (
+        '<div class="vocab-row">' +
+          '<span class="vocab-term">' + esc(v.term || '') + '</span>' +
+          '<span class="vocab-meta">' + esc(meta) + '</span>' +
+        '</div>'
+      );
+    }
+
+    const absHtml = absorbed.length
+      ? absorbed.map(absRow).join('')
+      : '<div class="section-empty">// nothing absorbed yet.</div>';
+    const pendHtml = pending.length
+      ? pending.map(pendRow).join('')
+      : '<div class="section-empty">// nothing pending.</div>';
+
+    return (
+      '<div class="vocab-grid">' +
+        '<div class="vocab-col">' +
+          '<div class="vocab-col-head">absorbed</div>' +
+          absHtml +
+        '</div>' +
+        '<div class="vocab-col">' +
+          '<div class="vocab-col-head">pending</div>' +
+          pendHtml +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  const RENDERERS = {
+    native_moves:   renderNativeMoves,
+    drift_map:      renderDriftMap,
+    register_check: renderRegisterCheck,
+    vocabulary:     renderVocabulary
+  };
+
+  function sectionBodyEl(key) {
+    return document.querySelector('[data-body="' + key + '"]');
+  }
+  function sectionEl(key) {
+    return document.querySelector('[data-section="' + key + '"]');
+  }
+  function sectionMetaEl(key) {
+    const sec = sectionEl(key);
+    return sec ? sec.querySelector('.section-meta') : null;
+  }
+
+  function renderSection(key, payload, meta) {
+    const body = sectionBodyEl(key);
+    if (!body) return;
+    const data = payload && payload[key];
+    body.innerHTML = RENDERERS[key](data);
+
+    const metaEl = sectionMetaEl(key);
+    if (metaEl && meta && meta.source) {
+      const lat = meta.latency_ms != null
+        ? (Math.round((meta.latency_ms / 100)) / 10).toFixed(1) + 's'
+        : '';
+      metaEl.textContent = '// ' + meta.source + (lat ? ' · ' + lat : '');
+    }
+  }
+
+  function renderEmptySection(key) {
+    const body = sectionBodyEl(key);
+    if (!body) return;
+    body.innerHTML =
+      '<button type="button" class="section-refresh" data-refresh="' + key + '">' +
+        '[ refresh from llm ]' +
+      '</button>';
+  }
+
+  function renderAllFromCache() {
+    const cached = readJSONLS(ANALYSIS_CACHE_KEY, null);
+    if (cached && cached.payload) {
+      SECTION_KEYS.forEach(function (k) {
+        renderSection(k, cached.payload, cached.payload.meta || {});
+      });
+      const stamp = document.getElementById('analysis-stamp');
+      if (stamp && cached.cached_at) {
+        const hhmm = formatHHMM(cached.cached_at);
+        stamp.textContent = hhmm ? '// cached ' + hhmm : '';
+      }
+      return true;
+    }
+    SECTION_KEYS.forEach(renderEmptySection);
+    return false;
+  }
+
+  function setRefreshingState(key, on) {
+    if (key === '__all__') {
+      const btn = document.getElementById('refresh-all');
+      if (btn) {
+        btn.disabled = on;
+        btn.style.opacity = on ? '0.5' : '';
+      }
+      SECTION_KEYS.forEach(function (k) {
+        const body = sectionBodyEl(k);
+        if (!body) return;
+        const status = on
+          ? '<div class="section-status">// asking ...</div>'
+          : '';
+        // Only show "asking" if section currently shows the refresh button
+        // (i.e. no cached content). For sections already populated we leave them.
+        const refresh = body.querySelector('[data-refresh]');
+        if (refresh && on) {
+          body.innerHTML = status;
+        }
+      });
+      return;
+    }
+    const body = sectionBodyEl(key);
+    if (!body) return;
+    if (on) {
+      body.innerHTML = '<div class="section-status">// asking ...</div>';
+    }
+  }
+
+  function fetchAnalysis(timeoutMs) {
+    timeoutMs = timeoutMs || 30000;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = setTimeout(function () {
+      if (controller) controller.abort();
+    }, timeoutMs);
+    return fetch(ANALYSIS_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ window_days: 30 }),
+      signal: controller ? controller.signal : undefined
+    }).then(function (resp) {
+      clearTimeout(timer);
+      if (!resp.ok) {
+        return resp.text().then(function () {
+          throw new Error('HTTP ' + resp.status);
+        });
+      }
+      return resp.json();
+    }).catch(function (err) {
+      clearTimeout(timer);
+      throw err;
+    });
+  }
+
+  function showError(scope) {
+    const html = '<div class="section-status">// unavailable &mdash; try again in a moment</div>';
+    if (scope === '__all__') {
+      SECTION_KEYS.forEach(function (k) {
+        const body = sectionBodyEl(k);
+        if (!body) return;
+        // only replace asking states; preserve existing cached content
+        if (body.querySelector('.section-status')) {
+          body.innerHTML = html +
+            '<div style="margin-top:10px;"><button type="button" class="section-refresh" data-refresh="' + k + '">[ retry ]</button></div>';
+        }
+      });
+      return;
+    }
+    const body = sectionBodyEl(scope);
+    if (body) {
+      body.innerHTML = html +
+        '<div style="margin-top:10px;"><button type="button" class="section-refresh" data-refresh="' + scope + '">[ retry ]</button></div>';
+    }
+  }
+
+  function doRefresh(scope) {
+    setRefreshingState(scope, true);
+    fetchAnalysis(30000).then(function (payload) {
+      const meta = payload && payload.meta ? payload.meta : {};
+      const cached_at = new Date().toISOString();
+      writeJSONLS(ANALYSIS_CACHE_KEY, { payload: payload, cached_at: cached_at });
+      SECTION_KEYS.forEach(function (k) {
+        renderSection(k, payload, meta);
+      });
+      const stamp = document.getElementById('analysis-stamp');
+      if (stamp) {
+        const hhmm = formatHHMM(cached_at);
+        stamp.textContent = hhmm ? '// cached ' + hhmm : '';
+      }
+      setRefreshingState('__all__', false);
+    }).catch(function (err) {
+      console.warn('[english.analysis] refresh failed', err);
+      setRefreshingState('__all__', false);
+      showError(scope);
+    });
+  }
+
+  // wire up sections
+  function initAnalysis() {
+    // open/closed state
+    const state = readJSONLS(ANALYSIS_STATE_KEY, {});
+    SECTION_KEYS.forEach(function (k) {
+      const sec = sectionEl(k);
+      if (!sec) return;
+      const toggle = sec.querySelector('.section-toggle');
+      if (state[k]) {
+        sec.classList.add('open');
+        if (toggle) toggle.setAttribute('aria-expanded', 'true');
+      }
+      if (toggle) {
+        toggle.addEventListener('click', function () {
+          const isOpen = sec.classList.toggle('open');
+          toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+          const cur = readJSONLS(ANALYSIS_STATE_KEY, {});
+          cur[k] = isOpen;
+          writeJSONLS(ANALYSIS_STATE_KEY, cur);
+        });
+      }
+    });
+
+    // render from cache (or empty refresh buttons)
+    renderAllFromCache();
+
+    // delegated click handlers for refresh buttons + row toggles
+    const root = document.getElementById('analysis');
+    if (root) {
+      root.addEventListener('click', function (e) {
+        const target = e.target;
+        if (!(target instanceof Element)) return;
+
+        const refreshBtn = target.closest('[data-refresh]');
+        if (refreshBtn) {
+          e.stopPropagation();
+          const key = refreshBtn.getAttribute('data-refresh');
+          // single-section refresh still uses the same endpoint (one round-trip
+          // populates all four; this matches the spec).
+          doRefresh(key);
+          return;
+        }
+
+        // drift-map row toggle
+        const dmRow = target.closest('.dm-row');
+        if (dmRow && !dmRow.hasAttribute('disabled')) {
+          const item = dmRow.closest('.dm-item');
+          if (item) {
+            const open = item.classList.toggle('open');
+            dmRow.setAttribute('aria-expanded', open ? 'true' : 'false');
+          }
+          return;
+        }
+
+        // register-check row toggle
+        const rcRow = target.closest('.rc-row');
+        if (rcRow && !rcRow.hasAttribute('disabled')) {
+          const item = rcRow.closest('.rc-item');
+          if (item) {
+            const open = item.classList.toggle('open');
+            rcRow.setAttribute('aria-expanded', open ? 'true' : 'false');
+          }
+        }
+      });
+    }
+
+    const allBtn = document.getElementById('refresh-all');
+    if (allBtn) {
+      allBtn.addEventListener('click', function () {
+        doRefresh('__all__');
+      });
+    }
+  }
+
+  initAnalysis();
+
+  // --- days ---------------------------------------------------------------
+  const daysEl = document.getElementById('days');
+
+  function totalItems() {
+    return days.reduce(function (n, d) {
+      return n + ((d && Array.isArray(d.items)) ? d.items.length : 0);
+    }, 0);
+  }
+
+  if (!days.length || totalItems() === 0) {
+    daysEl.innerHTML =
+      '<div class="empty">// no notes yet — once you save a journal with some english in it, upgrades land here.</div>';
+    return;
+  }
+
+  // Sort newest-first by date (YYYY-MM-DD lexicographic works).
+  const sortedDays = days.slice().sort(function (a, b) {
+    return String(b.date || '').localeCompare(String(a.date || ''));
+  });
+
+  const daysHtml = sortedDays.map(function (d) {
+    const items = Array.isArray(d.items) ? d.items : [];
+    if (!items.length) return '';
+
+    const weekday = esc(d.weekday || '');
+    const date = esc(d.date || '');
+    const n = items.length;
+    const countLabel = n + ' upgrade' + (n === 1 ? '' : 's');
+
+    const itemsHtml = items.map(function (it) {
+      const original = esc(it.original || '');
+      const suggested = esc(it.suggested || '');
+      const note = esc(it.note || '');
+      const context = it.context ? esc(it.context) : '';
+      const kind = it.kind ? esc(it.kind) : '';
+
+      const metaParts = [];
+      if (context) metaParts.push('<span class="eng-context">// in: "' + context + '"</span>');
+      if (context && kind) metaParts.push('<span class="eng-context-sep">&middot;</span>');
+      if (kind) metaParts.push('<span class="kind-tag">' + kind + '</span>');
+      const metaHtml = metaParts.length
+        ? '<div class="eng-item-meta">' + metaParts.join('') + '</div>'
+        : '';
+
+      return (
+        '<div class="eng-item">' +
+          metaHtml +
+          '<div class="eng-orig-row">' +
+            '<span class="eng-orig-label">from</span>' +
+            '<span class="eng-orig">' + original + '</span>' +
+          '</div>' +
+          '<div class="eng-upg-row">' +
+            '<span class="eng-upg-label">to</span>' +
+            '<span class="eng-upg">' + suggested + '</span>' +
+          '</div>' +
+          (note ? '<div class="eng-note">' + note + '</div>' : '') +
+        '</div>'
+      );
+    }).join('');
+
+    return (
+      '<div class="day">' +
+        '<div class="day-head">' +
+          '<div class="day-date">' +
+            (weekday ? '<span>' + weekday + '</span><span class="sep">&middot;</span>' : '') +
+            '<span>' + date + '</span>' +
+          '</div>' +
+          '<div class="day-count">' + countLabel + '</div>' +
+        '</div>' +
+        itemsHtml +
+      '</div>'
+    );
+  }).join('');
+
+  daysEl.innerHTML = daysHtml;
+})();
+</script>
+</body>
+</html>

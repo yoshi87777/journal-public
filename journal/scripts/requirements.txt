@@ -1,0 +1,16 @@
+# journal :: feedback server deps.
+#
+# The server is provider-agnostic via insight.py + vendor/llm_client.py.
+# Install only the SDK matching your LLM_PROVIDER. Lazy imports — having
+# all three installed is fine; missing ones are silently skipped.
+
+# Always required.
+fastapi>=0.115
+uvicorn>=0.30
+python-multipart>=0.0.9
+python-dotenv>=1.0
+
+# Provider SDKs — uncomment the one you'll use. (Or install ad-hoc via start.sh.)
+google-genai>=0.3
+# anthropic>=0.40
+# openai>=1.40

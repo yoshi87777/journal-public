@@ -1,0 +1,2912 @@
+<!doctype html>
+<html class="dark" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>today.</title>
+  <link rel="stylesheet" href="_tokens.css">
+  <script src="_accent.js"></script>
+  <style>
+    /* ===========================================================
+       page-local styles — every color/size below references tokens.
+       v1.1: novelty knobs, reactive animation, insight rendering.
+       =========================================================== */
+
+    /* Drifting + mouse-following accent blob. The translate is JS-driven via
+       --blob-x / --blob-y CSS variables; the drift keyframe is a fallback. */
+    .blob {
+      position: fixed;
+      top: 30%;
+      left: 50%;
+      width: 600px;
+      height: 600px;
+      transform: translate(calc(-50% + var(--blob-x, 0px)), calc(-50% + var(--blob-y, 0px))) scale(var(--blob-scale, 1));
+      background: radial-gradient(circle at center,
+        color-mix(in srgb, var(--accent) 15%, transparent) 0%,
+        transparent 60%);
+      filter: blur(80px);
+      z-index: -1;
+      pointer-events: none;
+      transition: transform var(--t-base) var(--ease);
+      will-change: transform;
+    }
+    .blob.drift { animation: drift 30s linear infinite; }
+    @keyframes drift {
+      0%   { transform: translate(calc(-55% + var(--blob-x, 0px)), calc(-52% + var(--blob-y, 0px))) scale(var(--blob-scale, 1)); }
+      50%  { transform: translate(calc(-45% + var(--blob-x, 0px)), calc(-48% + var(--blob-y, 0px))) scale(var(--blob-scale, 1)); }
+      100% { transform: translate(calc(-55% + var(--blob-x, 0px)), calc(-52% + var(--blob-y, 0px))) scale(var(--blob-scale, 1)); }
+    }
+
+    /* Subtle scroll-tied parallax on dot-grid via a CSS var the JS updates. */
+    html {
+      background:
+        radial-gradient(circle at 1px 1px, var(--dot) 1px, transparent 0) calc(0px + var(--grid-shift, 0px)) calc(0px + var(--grid-shift, 0px)) / var(--grid-spacing, 8px) var(--grid-spacing, 8px),
+        var(--bg);
+      background-attachment: fixed;
+    }
+
+    /* Header block — title + sparkline + chips on one row. */
+    .head-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin: 0 0 32px;
+      flex-wrap: wrap;
+    }
+    .head-left { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+    .head-right {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    h1.page-title { margin: 0; }
+    .spark {
+      display: inline-block;
+      vertical-align: bottom;
+      margin-left: 4px;
+    }
+    .subtitle {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      color: var(--muted);
+      margin: -16px 0 32px;
+      text-transform: none; /* flat statements include lowercase markup */
+    }
+
+    /* Status line: signature stamp + rotating extra element. */
+    .status .sig {
+      color: var(--muted-2);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--tight);
+    }
+    .status .rot {
+      color: var(--muted-2);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    /* Past-day chip with swatch dot. */
+    .day-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--tight);
+      padding: 3px 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--r-1);
+      color: var(--muted);
+      cursor: help;
+      transition: border-color var(--t-fast) var(--ease);
+    }
+    .day-chip:hover { border-color: var(--accent); color: var(--fg); }
+    .day-chip .sw {
+      width: 8px; height: 8px;
+      border-radius: var(--r-1);
+      border: 1px solid var(--border-2);
+      display: inline-block;
+    }
+
+    /* Drag handle — unicode ⋮ glyph, no negative letter-spacing. */
+    .q { position: relative; }
+    .q .drag {
+      position: absolute;
+      left: -22px;
+      top: 24px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--muted-2);
+      cursor: grab;
+      opacity: 0;
+      transition: opacity var(--t-fast) var(--ease);
+      user-select: none;
+      letter-spacing: 0;
+    }
+    .q:hover .drag { opacity: 1; }
+    .q .drag:active { cursor: grabbing; }
+    .q.dragging { opacity: 0.4; }
+    .q.drop-target { border-top-color: var(--accent); }
+
+    /* Slider rail — generous hit area. */
+    .slider-rail { cursor: pointer; touch-action: none; }
+    .slider-hit {
+      position: absolute;
+      left: 0; right: 0;
+      top: -10px; bottom: -10px;
+    }
+
+    /* Color picker — native input hidden under swatch. */
+    .color-pick { position: relative; }
+    .color-pick label {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .color-pick input[type="color"] {
+      position: absolute;
+      left: 0; top: 0;
+      width: 28px; height: 28px;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    /* Core-question marker. Tiny dot in the label so the user knows it's tracked. */
+    .q.core .q-label::after {
+      content: " · core";
+      color: var(--muted-2);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+    }
+
+    /* Form actions row. */
+    .actions {
+      margin-top: 36px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    .actions .left  { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .actions .right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+    .reroll-link, .toggle-link, .track-link {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      padding: 4px 0;
+      transition: color var(--t-fast) var(--ease);
+      text-decoration: none;
+    }
+    .reroll-link:hover, .toggle-link:hover, .track-link:hover { color: var(--accent); }
+    .reroll-link.reroll-warn {
+      color: var(--accent);
+      text-decoration: underline;
+      text-decoration-style: dashed;
+      text-underline-offset: 3px;
+      animation: rerollPulse 0.9s var(--ease) infinite;
+    }
+    @keyframes rerollPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.55; }
+    }
+    .kbd {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-1);
+      padding: 1px 5px;
+      margin-right: 4px;
+    }
+    .plain-mono {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted-2);
+      margin-right: 4px;
+    }
+
+    /* Caret-glyph pulse on typing. */
+    .btn-primary .caret {
+      display: inline-block;
+      animation: caret 1s steps(1) infinite;
+      transform-origin: center;
+      transition: transform 100ms var(--ease);
+    }
+    .btn-primary .caret.pulse {
+      transform: scale(1.4);
+    }
+
+    /* Save-status footer line. */
+    .save-stamp {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 14px;
+      min-height: 16px;
+      opacity: 0;
+      transition: opacity var(--t-base) var(--ease);
+    }
+    .save-stamp.shown { opacity: 1; }
+
+    /* Bottom right floating affordances. */
+    .float-bar {
+      position: fixed;
+      right: 18px;
+      bottom: 16px;
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+    }
+    .float-bar button {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--bg);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-1);
+      padding: 4px 8px;
+      cursor: pointer;
+      transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+    }
+    .float-bar button:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* Cheatsheet drawer. */
+    .cheat {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: var(--bg-2);
+      border-top: 1px solid var(--border-2);
+      transform: translateY(100%);
+      transition: transform var(--t-base) var(--ease);
+      padding: 22px 24px 28px;
+      z-index: 20;
+    }
+    .cheat.open { transform: translateY(0); }
+    .cheat h3 {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 14px;
+      font-weight: 400;
+    }
+    .cheat ul { list-style: none; padding: 0; margin: 0; columns: 2; gap: 32px; }
+    .cheat li {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--fg);
+      padding: 4px 0;
+    }
+    .cheat li .kbd { margin-right: 8px; }
+    .cheat .close-cheat {
+      position: absolute;
+      right: 16px;
+      top: 12px;
+      background: transparent;
+      border: 0;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .cheat .close-cheat:hover { color: var(--accent); }
+
+    /* Feedback inner — paste box and raw entry. */
+    .paste-wrap { margin-top: 14px; }
+    .paste-wrap summary {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--tight);
+      color: var(--muted);
+      cursor: pointer;
+      padding: 6px 0;
+      list-style: none;
+    }
+    .paste-wrap summary::-webkit-details-marker { display: none; }
+    .paste-wrap summary::before { content: "▸ "; color: var(--muted-2); }
+    .paste-wrap[open] summary::before { content: "▾ "; }
+    .paste-wrap textarea {
+      width: 100%;
+      min-height: 140px;
+      background: var(--bg-2);
+      color: var(--fg);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-1);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      resize: vertical;
+      margin-top: 8px;
+      transition: border-color var(--t-fast) var(--ease);
+    }
+    .paste-wrap textarea:focus { outline: none; border-color: var(--accent); }
+    .paste-wrap .render-btn {
+      margin-top: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--tight);
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: var(--r-1);
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: all var(--t-fast) var(--ease);
+    }
+    .paste-wrap .render-btn:hover { background: var(--accent); color: var(--bg); }
+    .paste-wrap .paste-err {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .raw-wrap { margin-top: 28px; }
+    .raw-wrap summary {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      cursor: pointer;
+      list-style: none;
+    }
+    .raw-wrap summary::-webkit-details-marker { display: none; }
+    .raw-wrap summary::before { content: "▸ "; color: var(--muted-2); }
+    .raw-wrap[open] summary::before { content: "▾ "; }
+    .raw-wrap pre {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-1);
+      padding: 12px;
+      overflow: auto;
+      max-height: 320px;
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    /* Gamification + patterns + prompt blocks. */
+    .gam-row {
+      display: flex;
+      gap: 28px;
+      flex-wrap: wrap;
+      align-items: baseline;
+    }
+    .gam-item { display: flex; flex-direction: column; gap: 4px; }
+    .gam-num {
+      font-family: var(--font-mono);
+      font-feature-settings: "tnum";
+      font-size: 28px;
+      color: var(--fg);
+      line-height: 1;
+    }
+    .gam-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .gam-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      padding: 4px 8px;
+      border: 1px solid var(--accent);
+      border-radius: var(--r-1);
+      align-self: center;
+    }
+    .pat-list { padding: 0; margin: 0; list-style: none; }
+    .pat-list li {
+      font-size: 14px;
+      color: var(--fg);
+      line-height: var(--lh-body);
+      padding: 6px 0;
+      border-top: 1px solid var(--border);
+    }
+    .pat-list li:first-child { border-top: 0; }
+    .pat-list li::before { content: "· "; color: var(--muted-2); font-family: var(--font-mono); }
+
+    /* Reflect (insight) channel — observations, kind chip on right, evidence indented. */
+    .reflect-list { padding: 0; margin: 0; list-style: none; }
+    .reflect-item {
+      padding: 10px 0;
+      border-top: 1px solid var(--border);
+    }
+    .reflect-item:first-child { border-top: 0; }
+    .reflect-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      justify-content: space-between;
+    }
+    .reflect-obs {
+      font-size: 15px;
+      line-height: var(--lh-body);
+      color: var(--fg);
+      flex: 1;
+    }
+    .reflect-obs::before { content: "· "; color: var(--muted-2); font-family: var(--font-mono); }
+    .reflect-kind {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--tight);
+      color: var(--muted);
+      flex-shrink: 0;
+      padding-top: 3px;
+    }
+    .reflect-evidence {
+      margin-top: 6px;
+      padding-left: 18px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      line-height: var(--lh-body);
+    }
+    .reflect-evidence::before {
+      content: "└ ";
+      color: var(--muted-2);
+    }
+    .reflect-evidence .ev-date {
+      color: var(--muted-2);
+      margin-right: 6px;
+    }
+    .reflect-evidence .ev-quote {
+      font-style: normal;
+    }
+
+    .prompt-tmw {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--accent);
+      padding: 12px 0 0;
+      line-height: var(--lh-body);
+    }
+    .prompt-tmw::before {
+      content: "// tomorrow: ";
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: var(--tight);
+    }
+
+    /* Source pill in feedback head. */
+    .feedback-head .source {
+      color: var(--muted);
+      font-family: var(--font-mono);
+    }
+    .feedback-head .source-name { color: var(--fg); }
+
+    /* Small color history strip. */
+    .past-strip {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      align-items: center;
+    }
+    .past-strip .pc {
+      width: 14px; height: 14px;
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-1);
+      cursor: help;
+    }
+
+    /* Emoji cell wrapper. */
+    .emoji-cell { display: flex; flex-direction: column; align-items: center; }
+
+    /* Mono-emoji row variant (used by texture/shape questions). */
+    .emoji-row.mono {
+      font-family: var(--font-mono);
+      font-size: 24px;
+    }
+
+    /* Path crumb with track link. */
+    .path-crumb {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .path-crumb .sep-mono { color: var(--muted-2); }
+
+    @media (max-width: 480px) {
+      .cheat ul { columns: 1; }
+    }
+
+    /* -------------------------------------------------------------------- */
+    /* Heavy widget — different weight class than the lights/mediums.        */
+    /* Only the heavy block gets these overrides.                            */
+    /* -------------------------------------------------------------------- */
+    .q.weight-heavy { padding-top: 24px; }
+    .heavy-sep {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: lowercase;
+      color: var(--muted-2);
+      margin: 0 0 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: clip;
+    }
+    .long-input-heavy {
+      font-size: 18px;
+      line-height: 1.75;
+      min-height: 200px;
+    }
+    .long-input-heavy::placeholder {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted-2);
+    }
+    .word-count-heavy {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-feature-settings: "tnum";
+      letter-spacing: var(--tight);
+      bottom: 4px;
+    }
+
+    /* -------------------------------------------------------------------- */
+    /* v1.2 — conversation reply UI, qgen out-of-stock, opt-in enrich.       */
+    /* -------------------------------------------------------------------- */
+
+    /* eng-item layout (was implicit; make it explicit so reply-box fits). */
+    .eng-item {
+      padding: 8px 0;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 6px;
+      line-height: var(--lh-body);
+    }
+    .eng-item:first-child { border-top: 0; }
+    .eng-orig { color: var(--muted); font-family: var(--font-mono); font-size: 13px; }
+    .eng-arrow { color: var(--muted-2); font-family: var(--font-mono); font-size: 12px; }
+    .eng-upg { color: var(--fg); font-size: 14px; line-height: var(--lh-body); }
+    .eng-note {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      flex-basis: 100%;
+      margin-top: 2px;
+    }
+
+    /* Reply affordance — small mono right-aligned. */
+    .reply-toggle {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--tight);
+      color: var(--muted-2);
+      cursor: pointer;
+      margin-top: 4px;
+      margin-left: auto;
+      background: transparent;
+      border: 0;
+      padding: 2px 0;
+      transition: color var(--t-fast) var(--ease);
+      align-self: flex-end;
+      flex-basis: 100%;
+      text-align: right;
+    }
+    .reply-toggle:hover { color: var(--accent); }
+    .reply-toggle.thread-reply {
+      flex-basis: auto;
+      margin-top: 2px;
+    }
+
+    /* Reply box — collapsed by default, expands inline. */
+    .reply-box {
+      flex-basis: 100%;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height var(--t-base) var(--ease);
+    }
+    .reply-box.open {
+      max-height: none;
+      border-top: 1px solid var(--border);
+      padding: 10px 0 0;
+      margin-top: 8px;
+      overflow: visible;
+    }
+    .reply-box textarea {
+      width: 100%;
+      min-height: 80px;
+      background: var(--bg-2);
+      color: var(--fg);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-1);
+      padding: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      resize: vertical;
+      transition: border-color var(--t-fast) var(--ease);
+    }
+    .reply-box textarea:focus { outline: none; border-color: var(--accent); }
+    .reply-send {
+      margin-top: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--tight);
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: var(--r-1);
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: all var(--t-fast) var(--ease);
+    }
+    .reply-send:hover { background: var(--accent); color: var(--bg); }
+    .reply-send:disabled { opacity: 0.5; cursor: default; }
+    .reply-status {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      margin-left: 8px;
+    }
+
+    /* Threaded turns. */
+    .thread-wrap { margin-top: 8px; }
+    .thread-turn {
+      padding: 8px 0;
+      border-top: 1px solid var(--border);
+    }
+    .thread-role {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-right: 8px;
+    }
+    .thread-role.you { color: var(--muted); }
+    .thread-role.assistant { color: var(--accent); }
+    .thread-text {
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--fg);
+      margin-top: 2px;
+    }
+    .thread-latency {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      margin-left: 8px;
+    }
+    .thread-old-note {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted-2);
+      margin-left: 8px;
+    }
+
+    /* qgen "out of stock" chip — sits below form. */
+    .qgen-chip {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--tight);
+      color: var(--muted);
+      margin: 16px 0 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .qgen-chip-btn {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--tight);
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: var(--r-1);
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: all var(--t-fast) var(--ease);
+    }
+    .qgen-chip-btn:hover { background: var(--accent); color: var(--bg); }
+    .qgen-chip-btn:disabled { opacity: 0.5; cursor: default; }
+    .qgen-status {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .qgen-pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin: 8px 0 0;
+      opacity: 1;
+      transition: opacity var(--t-base) var(--ease);
+    }
+    .qgen-pill.fade { opacity: 0; }
+
+    /* Freshen-labels footer link. */
+    .freshen-link {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--tight);
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      padding: 0;
+      transition: color var(--t-fast) var(--ease);
+    }
+    .freshen-link:hover { color: var(--accent); }
+    .freshen-link:disabled { opacity: 0.5; cursor: default; }
+    .freshen-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: 12px;
+      opacity: 1;
+      transition: opacity var(--t-base) var(--ease);
+    }
+    .freshen-badge.fade { opacity: 0; }
+
+    /* prefers-reduced-motion — kill the dynamic stuff, keep base. */
+    @media (prefers-reduced-motion: reduce) {
+      .blob { animation: none !important; transition: none !important; }
+      .btn-primary .caret { animation: none !important; }
+      html { background-attachment: scroll; }
+      .reply-box { transition: none !important; }
+      .qgen-pill, .freshen-badge { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="blob drift" id="blob" aria-hidden="true"></div>
+
+  <main class="wrap">
+    <div class="status" id="status"></div>
+
+    <div class="head-row">
+      <div class="head-left">
+        <h1 class="page-title">today<span class="dot">.</span></h1>
+        <svg class="spark" id="spark" width="80" height="24" viewBox="0 0 80 24" aria-hidden="true">
+          <polyline id="spark-line" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+        </svg>
+      </div>
+      <div class="head-right" id="past-chips"></div>
+    </div>
+
+    <div class="subtitle" id="subtitle"></div>
+
+    <form id="form" autocomplete="off"></form>
+
+    <div class="qgen-chip" id="qgen-chip" hidden>
+      <span>// running low —</span>
+      <button type="button" class="qgen-chip-btn" id="qgen-ask">[ ask gemini ]</button>
+      <span class="qgen-status" id="qgen-status"></span>
+    </div>
+    <div class="qgen-pill" id="qgen-pill" hidden></div>
+
+    <div class="actions">
+      <div class="left">
+        <button type="button" class="btn-primary" id="save">
+          $ <span class="caret" id="caret">▍</span>save_today
+        </button>
+        <span class="save-stamp" id="save-stamp"></span>
+      </div>
+      <div class="right">
+        <button type="button" class="reroll-link" id="reroll"><span class="kbd">esc</span>↻ reroll prompts</button>
+      </div>
+    </div>
+
+    <section class="feedback" id="feedback" aria-live="polite">
+      <div class="feedback-head">
+        <span>feedback agent</span>
+        <span class="sep">·</span>
+        <span class="source"><span class="source-name" id="source-name">—</span></span>
+        <span class="sep">·</span>
+        <span class="latency" id="latency">0.0s</span>
+      </div>
+
+      <div class="feedback-block" id="fb-english">
+        <h3>english</h3>
+        <div id="fb-english-list"></div>
+      </div>
+
+      <div class="feedback-block" id="fb-reflect" hidden>
+        <h3>reflect</h3>
+        <ul class="reflect-list" id="fb-reflect-list"></ul>
+      </div>
+
+      <div class="feedback-block" id="fb-gam">
+        <h3>gamification</h3>
+        <div class="gam-row" id="fb-gam-row"></div>
+      </div>
+
+      <div class="feedback-block" id="fb-patterns">
+        <h3>patterns</h3>
+        <ul class="pat-list" id="fb-pat-list"></ul>
+      </div>
+
+      <div class="feedback-block" id="fb-prompt">
+        <h3>tomorrow</h3>
+        <div class="prompt-tmw" id="fb-prompt-text"></div>
+      </div>
+
+      <details class="paste-wrap" id="paste-wrap">
+        <summary>// no server detected — paste feedback from claude</summary>
+        <textarea id="paste-area" placeholder='{"english":[...],"reflect":[...],"gamification":{...},"patterns":[...],"prompt_for_tomorrow":"..."}'></textarea>
+        <div>
+          <button type="button" class="render-btn" id="paste-render">[ render saved feedback ]</button>
+          <span class="paste-err" id="paste-err"></span>
+        </div>
+      </details>
+
+      <details class="raw-wrap" id="raw-wrap">
+        <summary>raw entry json</summary>
+        <pre id="raw-json"></pre>
+      </details>
+    </section>
+
+    <div class="path-crumb">
+      <span>~/life-os/journal/today.html</span>
+      <span class="sep-mono">·</span>
+      <a class="track-link" href="archive.html"><span class="kbd">⌘+t</span>track →</a>
+      <span class="sep-mono">·</span>
+      <button type="button" class="freshen-link" id="freshen-link">// [ ✦ freshen labels ]</button>
+      <span class="freshen-badge" id="freshen-badge" hidden></span>
+    </div>
+  </main>
+
+  <div class="float-bar">
+    <button type="button" id="theme-toggle" title="toggle dark/light">[☾]</button>
+    <button type="button" id="cheat-toggle" title="keyboard cheatsheet">[?]</button>
+  </div>
+
+  <aside class="cheat" id="cheat" aria-hidden="true">
+    <button type="button" class="close-cheat" id="close-cheat">[esc] close</button>
+    <h3>shortcuts</h3>
+    <ul>
+      <li><span class="kbd">⌘+S</span> save today</li>
+      <li><span class="kbd">esc</span> reroll prompts</li>
+      <li><span class="kbd">⌘+/</span> toggle this sheet</li>
+      <li><span class="kbd">⌘+T</span> open track view</li>
+      <li><span class="kbd">⌘+B</span> back to write.html</li>
+      <li><span class="kbd">⌘+P</span> paste box (raw json)</li>
+      <li><span class="kbd">r</span> toggle reply on focused insight item</li>
+      <li><span class="plain-mono">[ ask gemini ]</span> appears below form at reroll ≥ 5</li>
+      <li><span class="plain-mono">[ ✦ freshen labels ]</span> footer — re-tune labels via gemini</li>
+      <li><span class="plain-mono">drag</span> reorder questions</li>
+      <li><span class="plain-mono">[?]</span> this cheatsheet</li>
+      <li><span class="kbd">↹</span> next field</li>
+    </ul>
+  </aside>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ===========================================================
+     THEME — dark / light, persisted in lifeOs.theme.
+     =========================================================== */
+  const THEME_KEY = 'lifeOs.theme';
+  const savedTheme = localStorage.getItem(THEME_KEY);
+  if (savedTheme === 'light') {
+    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.add('light');
+  } else if (!savedTheme) {
+    // respect system preference on first load
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    }
+  }
+
+  function updateThemeGlyph() {
+    const btn = document.getElementById('theme-toggle');
+    const isDark = document.documentElement.classList.contains('dark');
+    // when dark, show moon; when light, show sun.
+    btn.textContent = isDark ? '[☾]' : '[☼]';
+  }
+  updateThemeGlyph();
+
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const isDark = document.documentElement.classList.contains('dark');
+    document.documentElement.classList.toggle('dark', !isDark);
+    document.documentElement.classList.toggle('light', isDark);
+    localStorage.setItem(THEME_KEY, isDark ? 'light' : 'dark');
+    updateThemeGlyph();
+  });
+
+  /* ===========================================================
+     ACCENT + STATUS LINE.
+     =========================================================== */
+  const accent = lifeOs.applyAccent();
+  document.getElementById('spark').style.color = accent.hex;
+
+  /* ===========================================================
+     DATE + URL STATE.
+     =========================================================== */
+  const url = new URL(location.href);
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm   = String(today.getMonth() + 1).padStart(2, '0');
+  const dd   = String(today.getDate()).padStart(2, '0');
+  const dateStr = `${yyyy}-${mm}-${dd}`;
+  const weekday = lifeOs.formatWeekday(today);
+
+  const rerollN = parseInt(url.searchParams.get('reroll') || '0', 10);
+  const rng = lifeOs.makeRng(today, rerollN * 7919);
+  const pick = (arr) => arr[Math.floor(rng() * arr.length)];
+  const shuffle = (arr) => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  // A second RNG for the daily-novelty layer that does NOT change with reroll.
+  // Subtitles, caret glyphs, grid variants, signatures — those are stable for
+  // the whole day regardless of how many times we reroll the prompts.
+  const dayRng = lifeOs.makeRng(today, 0);
+  const dayPick = (arr) => arr[Math.floor(dayRng() * arr.length)];
+
+  /* ===========================================================
+     NOVELTY KNOB 1 — flat-statement subtitle (40+ pool).
+     =========================================================== */
+  const SUBTITLES = [
+    '// 2-5 min. no rules.',
+    '// log it. close it.',
+    '// commit something honest.',
+    '// terse beats polished.',
+    '// one true sentence is plenty.',
+    '// show up. press save.',
+    '// this won\'t be perfect.',
+    '// future-you skims this in 3 months.',
+    '// today, lightly.',
+    '// surface only — depth lives in deep/.',
+    '// 6 widgets, 2 minutes, done.',
+    '// no streak shame.',
+    '// half-filled beats empty.',
+    '// you can leave fields blank.',
+    '// don\'t reach for insight. log first.',
+    '// write small. write often.',
+    '// drag the questions if you want.',
+    '// esc rerolls. cmd+s saves.',
+    '// no audience. no algorithm.',
+    '// this is the surface. there is a deep/.',
+    '// the data is for you. not for them.',
+    '// describe before you explain.',
+    '// vague is fine. specific is better.',
+    '// trust the boring days.',
+    '// pattern emerges from boring days.',
+    '// one widget at a time.',
+    '// type whatever is true right now.',
+    '// fragments are valid input.',
+    '// caps and punctuation are optional.',
+    '// english is fine. japanese is fine.',
+    '// no one will grade this.',
+    '// the only metric is showing up.',
+    '// log a 3 if it was a 3.',
+    '// you don\'t have to mean it.',
+    '// leave the heavy one for tomorrow.',
+    '// note the surface, save the depth.',
+    '// keep the entry shorter than the day.',
+    '// don\'t edit. submit.',
+    '// the friction is the feature.',
+    '// short days deserve short entries.',
+    '// what wasn\'t said today?',
+    '// stay close to the ground.',
+    '// the form is loose on purpose.',
+  ];
+  document.getElementById('subtitle').textContent = dayPick(SUBTITLES);
+
+  /* ===========================================================
+     NOVELTY KNOB 2 — caret glyph variants.
+     =========================================================== */
+  const CARETS = ['▍', '▌', '▎', '▏', '█', '┃', '▮'];
+  const todayCaret = dayPick(CARETS);
+  document.getElementById('caret').textContent = todayCaret;
+
+  /* ===========================================================
+     NOVELTY KNOB 3 — seed signature (5-glyph hash).
+     =========================================================== */
+  function dailySignature() {
+    const seed = lifeOs.dateSeed(today);
+    const alpha = '0123456789abcdef';
+    let h = seed;
+    let out = '';
+    for (let i = 0; i < 5; i++) {
+      h = (h * 9301 + 49297) % 233280;
+      out += alpha[h % alpha.length];
+    }
+    return out;
+  }
+  const SIG = dailySignature();
+
+  /* ===========================================================
+     NOVELTY KNOB 4 — dot-grid variant.
+     =========================================================== */
+  const GRID_VARIANTS = ['default', 'dense', 'sparse', 'crosshair'];
+  const todayGrid = dayPick(GRID_VARIANTS);
+  (function applyGridVariant() {
+    const htmlEl = document.documentElement;
+    if (todayGrid === 'dense') {
+      htmlEl.style.setProperty('--grid-spacing', '6px');
+    } else if (todayGrid === 'sparse') {
+      htmlEl.style.setProperty('--grid-spacing', '10px');
+    } else if (todayGrid === 'crosshair') {
+      // swap background to a crosshair pattern. Inline override.
+      const style = document.createElement('style');
+      style.textContent =
+        'html { background: ' +
+        '  linear-gradient(var(--dot) 1px, transparent 0) 0 0 / 8px 8px,' +
+        '  linear-gradient(90deg, var(--dot) 1px, transparent 0) 0 0 / 8px 8px,' +
+        '  var(--bg);' +
+        '  background-attachment: fixed;' +
+        '}';
+      document.head.appendChild(style);
+    }
+  })();
+
+  /* ===========================================================
+     STATUS LINE MOUNT + novelty extras.
+     =========================================================== */
+  const statusEl = document.getElementById('status');
+  lifeOs.mountStatusLine(statusEl, { page: 'JOURNAL', version: 'v1.1' });
+
+  // Append novelty extras after a tick so mountStatusLine's setInterval doesn't overwrite.
+  // mountStatusLine re-renders innerHTML every second — we hook in by appending children
+  // after each render. Simpler: wrap a MutationObserver, or rebuild ourselves.
+  // Approach: shadow the status renderer with our own that pulls from lifeOs.formatTime.
+  (function ownStatusLine() {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    const pageStart = performance.now();
+    const ROT_VARIANTS = ['uptime', 'accent', 'moonphase', 'tz'];
+    const todayRot = dayPick(ROT_VARIANTS);
+
+    function moonGlyph() {
+      const start = new Date(today.getFullYear(), 0, 0);
+      const diff = today - start + ((start.getTimezoneOffset() - today.getTimezoneOffset()) * 60 * 1000);
+      const oneDay = 1000 * 60 * 60 * 24;
+      const doy = Math.floor(diff / oneDay);
+      const phases = ['○', '◔', '◑', '◕', '●', '◕', '◑', '◔'];
+      return phases[Math.floor((doy / 365) * 8) % 8];
+    }
+
+    function render() {
+      const n = new Date();
+      const uptime = ((performance.now() - pageStart) / 1000) | 0;
+      let rotHtml = '';
+      if (todayRot === 'uptime') {
+        rotHtml = `<span class="rot">uptime: ${uptime}s</span>`;
+      } else if (todayRot === 'accent') {
+        rotHtml = `<span class="rot">accent: ${accent.name}</span>`;
+      } else if (todayRot === 'moonphase') {
+        rotHtml = `<span class="rot">moon: ${moonGlyph()}</span>`;
+      } else {
+        rotHtml = `<span class="rot">tz: ${tz}</span>`;
+      }
+      statusEl.innerHTML =
+        `<span>JOURNAL</span>` +
+        `<span class="sep">·</span>` +
+        `<span>${lifeOs.formatDate(n)}</span>` +
+        `<span class="sep">·</span>` +
+        `<span>${lifeOs.formatWeekday(n)}</span>` +
+        `<span class="sep">·</span>` +
+        `<span>${lifeOs.formatTime(n)}</span>` +
+        `<span class="sep">·</span>` +
+        `<span><span class="live-dot"></span>live</span>` +
+        `<span class="sep">·</span>` +
+        `<span class="ver">v1.1</span>` +
+        `<span class="sep">·</span>` +
+        `<span class="sig">[ ${SIG} ]</span>` +
+        `<span class="sep">·</span>` +
+        rotHtml;
+    }
+    render();
+    setInterval(render, 1000);
+  })();
+
+  /* ===========================================================
+     QUESTION BANK — 100+ items.
+     Core questions are the trackable axis: mood, energy, oneliner.
+     =========================================================== */
+  const CORE_IDS = ['mood', 'energy', 'oneliner'];
+
+  const QBANK = [
+    // ----- CORE (always shown) -----
+    { id:'mood',     type:'slider', label:'How\'s your mood?',  min:0, max:10,  leftLabel:'low',     rightLabel:'high',  weight:'light', core:true },
+    { id:'energy',   type:'slider', label:'Energy level',        min:0, max:100, leftLabel:'drained', rightLabel:'wired', weight:'light', core:true },
+    { id:'oneliner', type:'shorttext', label:'Sum up today in one line', placeholder:'just one line — english is great here', weight:'medium', core:true },
+
+    // ----- LIGHT (sliders) -----
+    { id:'social',          type:'slider', label:'Where did your social meter land?',  min:0, max:10, leftLabel:'solo',           rightLabel:'with people', weight:'light' },
+    { id:'pace',            type:'slider', label:'How heavy did time feel today?',     min:0, max:10, leftLabel:'weightless',     rightLabel:'leaden',      weight:'light' },
+    { id:'inside_out',      type:'slider', label:'Where was your head?',   min:0, max:10, leftLabel:'inside my head', rightLabel:'in the world', weight:'light' },
+    { id:'optimism',        type:'slider', label:'Optimism dial',          min:0, max:10, leftLabel:'flat',           rightLabel:'lit',          weight:'light' },
+    { id:'boldness',        type:'slider', label:'Boldness today',         min:0, max:10, leftLabel:'cautious',       rightLabel:'reckless',     weight:'light' },
+    { id:'clarity',         type:'slider', label:'How clear was your head?', min:0, max:10, leftLabel:'fog',          rightLabel:'crystal',      weight:'light' },
+    { id:'restlessness',    type:'slider', label:'Restlessness',           min:0, max:10, leftLabel:'settled',        rightLabel:'jumpy',        weight:'light' },
+    { id:'presence',        type:'slider', label:'Presence',               min:0, max:10, leftLabel:'elsewhere',      rightLabel:'here',         weight:'light' },
+    { id:'body_battery',    type:'slider', label:'Body battery',           min:0, max:10, leftLabel:'depleted',       rightLabel:'charged',      weight:'light' },
+    { id:'social_battery',  type:'slider', label:'Social battery',         min:0, max:10, leftLabel:'empty',          rightLabel:'full',         weight:'light' },
+    { id:'creative_battery',type:'slider', label:'Creative battery',       min:0, max:10, leftLabel:'dry',            rightLabel:'flowing',      weight:'light' },
+    { id:'noise_level',     type:'slider', label:'Inner noise level',      min:0, max:10, leftLabel:'silent',         rightLabel:'loud',         weight:'light' },
+    { id:'craving',         type:'slider', label:'Craving today',          min:0, max:10, leftLabel:'none',           rightLabel:'pulling',      weight:'light' },
+    { id:'agency',          type:'slider', label:'Agency over today',      min:0, max:10, leftLabel:'reactive',       rightLabel:'in-control',   weight:'light' },
+    { id:'pace_vs_yest',    type:'slider', label:'Pace vs yesterday',      min:0, max:10, leftLabel:'slower',         rightLabel:'faster',       weight:'light' },
+    { id:'coffee_balance',  type:'slider', label:'Coffee balance',         min:0, max:10, leftLabel:'under',          rightLabel:'over',         weight:'light' },
+
+    // ----- LIGHT (emoji — capped to ≤1/day) -----
+    { id:'weather_in', type:'emoji', label:'Today\'s inner weather', options:['☀️','⛅','🌧️','⛈️','🌨️','🌈','🌫️','🌪️'], weight:'light' },
+    { id:'animal',     type:'emoji', label:'If today were an animal', options:['🐢','🦁','🦊','🐱','🦦','🦅','🦉','🐙','🐝','🐳'], weight:'light' },
+    { id:'plant',      type:'emoji', label:'If today were a plant',   options:['🌱','🌳','🌵','🌻','🌾','🍄','🪴','🌹'], weight:'light' },
+    { id:'face',       type:'emoji', label:'A face that fits today',  options:['😊','🙂','😐','😶','🙃','😮‍💨','😔','🤔','😤','🥲'], weight:'light' },
+    { id:'texture',    type:'emoji', label:'Texture of today',  options:['·','—','○','◇','△','▿','▒','░'], mono:true, weight:'light' },
+    { id:'shape',      type:'emoji', label:'Shape of today',    options:['│','╱','╲','○','◇','□','△','∞'], mono:true, weight:'light' },
+    { id:'sound',      type:'emoji', label:'Sound of today',    options:['—','~','≈','♪','×','!','?','.'], mono:true, weight:'light' },
+
+    // ----- LIGHT (stars / numbers / color) -----
+    { id:'focus',   type:'slider', label:'How sharp was your attention today?', min:0, max:10, leftLabel:'scattered', rightLabel:'razor', weight:'light' },
+    { id:'learn',   type:'stars',  label:'How much new ground broke today?',    max:5, weight:'light' },
+    { id:'meaning', type:'stars',  label:'How much of today should outlast it?', max:5, weight:'light' },
+    { id:'effort',  type:'stars',  label:'Effort poured in',           max:5, weight:'light' },
+    { id:'rest',    type:'stars',  label:'How well did you rest?',     max:5, weight:'light' },
+    { id:'color',   type:'color',  label:'What color was today?',      weight:'light' },
+    { id:'sleep',   type:'number', label:'Hours of sleep last night',  min:0, max:14, step:0.5, default:7,  weight:'light' },
+    { id:'coffee',  type:'number', label:'Coffees today',              min:0, max:10, step:1,   default:1,  weight:'light' },
+    { id:'outside', type:'number', label:'Roughly, minutes outside',   min:0, max:300, step:15, default:30, weight:'light' },
+    { id:'screen',  type:'number', label:'Hours of screen time',       min:0, max:16, step:0.5, default:6,  weight:'light' },
+    { id:'water',   type:'number', label:'Glasses of water',           min:0, max:16, step:1,   default:4,  weight:'light' },
+    { id:'meals',   type:'number', label:'Meals worth counting',       min:0, max:6,  step:1,   default:3,  weight:'light' },
+    { id:'people',  type:'number', label:'People I actually talked to', min:0, max:50, step:1,  default:3,  weight:'light' },
+
+    // ----- MEDIUM (choice) -----
+    { id:'mode',           type:'choice', label:'today i was…',                 options:['building','defending','drifting','watching','running'], weight:'medium' },
+    { id:'in_out',         type:'choice', label:'Input or output day?',         options:['input','output','both','neither'], weight:'medium' },
+    { id:'alone_with',     type:'choice', label:'Better with people or alone?', options:['with people','alone','mixed'], weight:'medium' },
+    { id:'forward',        type:'choice', label:'Did today move you forward?',  options:['yes','no','sideways','stuck'], weight:'medium' },
+    { id:'direction',      type:'choice', label:'Direction of today',           options:['towards','away','sideways','stuck'], weight:'medium' },
+    { id:'lens',           type:'choice', label:'Lens today',                   options:['zoomed-in','zoomed-out','both','neither'], weight:'medium' },
+    { id:'who_for',        type:'choice', label:'Who was today for?',           options:['me','them','no one','both'], weight:'medium' },
+    { id:'default_mode',   type:'choice', label:'Default mode today',           options:['builder','observer','coordinator','drifter'], weight:'medium' },
+    { id:'pace_label',     type:'choice', label:'Pace shape today',             options:['linear','spiral','spike','flat'], weight:'medium' },
+    { id:'signal_noise',   type:'choice', label:'Signal to noise',              options:['mostly-signal','mostly-noise','mixed','hard-to-tell'], weight:'medium' },
+    { id:'weather_match',  type:'choice', label:'Did weather match mood?',      options:['yes','no','sort-of','didn\'t notice'], weight:'medium' },
+    { id:'energy_arc',     type:'choice', label:'Energy arc of the day',        options:['climb','crash','plateau','wave'], weight:'medium' },
+    { id:'time_felt',      type:'choice', label:'Time felt…',                   options:['fast','slow','normal','warped'], weight:'medium' },
+
+    // ----- MEDIUM (tags) -----
+    { id:'touched',         type:'tags', label:'what surfaces did you spend yourself on?', options:['code','people','paper','the body','the city','screens','food','money','music','no one'], weight:'medium' },
+    { id:'emotions',        type:'tags', label:'emotions that showed up',     options:['calm','tense','curious','tired','proud','frustrated','grateful','lonely','playful','focused','restless','content','anxious','light','wired','flat','tender','annoyed','hopeful','small','spacious','heavy','wired'], weight:'medium' },
+    { id:'did_today',       type:'tags', label:'Did, today',                  options:['worked','studied','walked','cooked','read','texted','mood-walked','errands','chores','nothing-special','meeting','call','workout','nap','journaled'], weight:'medium' },
+    { id:'said_no_to',      type:'tags', label:'Said no to',                  options:['meeting','coffee','drink','call','extra-work','scrolling','new-project','shopping','event','favor','help','reply'], weight:'medium' },
+    { id:'talked_to',       type:'tags', label:'Talked to (briefly)',         options:['partner','friend','family','colleague','stranger','mentor','client','barista','no one'], weight:'medium' },
+    { id:'mood_words',      type:'tags', label:'Mood words for today',        options:['steady','wired','soft','sharp','hollow','full','bright','dim','warm','cool','quiet','jagged','loose','tight','open','folded','low-key','keyed-up','sober','melty','glassy','crisp','dusty'], weight:'medium' },
+    { id:'consumed',        type:'tags', label:'Consumed today',              options:['podcast','article','video','paper','book-chapter','code','tweet','newsletter','conversation','silence'], weight:'medium' },
+    { id:'avoided',         type:'tags', label:'Avoided today',               options:['inbox','that-task','that-person','difficult-thought','phone-call','workout','sleep','food','news'], weight:'medium' },
+    { id:'felt_like',       type:'tags', label:'Today felt like…',            options:['a-monday','a-friday','a-sunday','a-tuesday','a-rerun','a-pilot','a-bridge','a-pause','a-page-turn'], weight:'medium' },
+
+    // ----- MEDIUM (shorttext) -----
+    { id:'win',          type:'shorttext', label:'What did you almost not do today, but did?', placeholder:'the one you nearly skipped…', weight:'medium' },
+    { id:'stuck',        type:'shorttext', label:'What stayed with you?',             placeholder:'a moment, a phrase, a face that wouldn\'t leave…', weight:'medium' },
+    { id:'gratitude',    type:'shorttext', label:'What did today give you that you didn\'t expect?', placeholder:'a gift you didn\'t pay for…', weight:'medium' },
+    { id:'tomorrow',     type:'shorttext', label:'One small thing for tomorrow',      placeholder:'just one', weight:'medium' },
+    { id:'curious',      type:'shorttext', label:'What sparked your curiosity?',      weight:'medium' },
+    { id:'doubt',        type:'shorttext', label:'A doubt I had today',               weight:'medium' },
+    { id:'laugh',        type:'shorttext', label:'Something that made me laugh',      weight:'medium' },
+    { id:'three_words',  type:'shorttext', label:'today in three words. don\'t overthink.',  placeholder:'word, word, word', weight:'medium' },
+    { id:'metaphor',     type:'shorttext', label:'today was like ___',                placeholder:'a slow river / a sprint / fog / a tightrope…', weight:'medium' },
+    { id:'unsaid',       type:'shorttext', label:'something you didn\'t say today.',  placeholder:'the one you held back…', weight:'medium' },
+    { id:'replayed',     type:'shorttext', label:'A moment you re-watched in your head', placeholder:'one image will do', weight:'medium' },
+    { id:'wished_asked', type:'shorttext', label:'Wished you had asked',              placeholder:'one question, unasked', weight:'medium' },
+    { id:'funniest',     type:'shorttext', label:'Funniest moment of today',          weight:'medium' },
+    { id:'japanese',     type:'shorttext', label:'Most japanese moment of today',     placeholder:'when something felt familiarly home', weight:'medium' },
+    { id:'american',     type:'shorttext', label:'Most american moment of today',     placeholder:'the opposite of the above', weight:'medium' },
+    { id:'food_anchor',  type:'shorttext', label:'Food that anchored the day',        placeholder:'what grounded you', weight:'medium' },
+    { id:'weather_inside_outside', type:'shorttext', label:'Weather inside vs outside', placeholder:'two clauses, comma', weight:'medium' },
+    { id:'quietest',     type:'shorttext', label:'Quietest part of today',            weight:'medium' },
+    { id:'loudest',      type:'shorttext', label:'Loudest part of today',             weight:'medium' },
+    { id:'most_yourself',type:'shorttext', label:'when in the day did you feel most yourself?',  placeholder:'the moment / where / why…', weight:'medium' },
+    { id:'least_yourself',type:'shorttext', label:'when in the day did you feel least yourself?', placeholder:'the disconnect…', weight:'medium' },
+    { id:'almost_said',  type:'shorttext', label:'Something you almost said',         weight:'medium' },
+    { id:'noticed',      type:'shorttext', label:'Something you noticed only because you\'re paying attention', weight:'medium' },
+    { id:'mistaken',     type:'shorttext', label:'Something you were wrong about',    weight:'medium' },
+    { id:'overheard',    type:'shorttext', label:'Best thing you overheard',          weight:'medium' },
+    { id:'one_image',    type:'shorttext', label:'One image from today',              placeholder:'something visual you\'ll remember', weight:'medium' },
+    { id:'one_sound',    type:'shorttext', label:'One sound from today',              weight:'medium' },
+    { id:'one_smell',    type:'shorttext', label:'One smell from today',              weight:'medium' },
+
+    // ----- HEAVY (longtext / timeline) -----
+    { id:'timeline',     type:'timeline', label:'One line for each part of the day', segments:['morning','afternoon','evening'], weight:'heavy' },
+    { id:'free',         type:'longtext', label:'Anywhere your mind wants to go',                         placeholder:'// no rules. just write.', weight:'heavy' },
+    { id:'future_self',  type:'longtext', label:'a short note to your future self (3 months out)',     placeholder:'dear me, three months from now…', weight:'heavy' },
+    { id:'past_self',    type:'longtext', label:'what would you tell yourself a year ago?',            placeholder:'hey me in 2025…', weight:'heavy' },
+    { id:'observation',  type:'longtext', label:'someone you observed today — and what you took from them', placeholder:'who, what, why it mattered', weight:'heavy' },
+    { id:'struggle',     type:'longtext', label:'describe a tension you sat in without resolving.',    placeholder:'the honest version. not the version you\'d tell anyone.', weight:'heavy' },
+    { id:'deep_question',type:'longtext', label:'a question you don\'t want to answer yet. write it down.', placeholder:'the one you\'re letting sit.', weight:'heavy' },
+    { id:'letter_future_partner', type:'longtext', label:'A letter to a future partner', placeholder:'they\'ll never read it. that\'s fine.', weight:'heavy' },
+    { id:'letter_from_mentor',    type:'longtext', label:'A letter from an old mentor (written by you, addressed to you)', placeholder:'what would they say to you today?', weight:'heavy' },
+    { id:'someone_envy', type:'longtext', label:'Someone you envy today, and why',       placeholder:'envy is information', weight:'heavy' },
+    { id:'avoiding',     type:'longtext', label:'The decision you\'re avoiding',         placeholder:'name it. just naming it.', weight:'heavy' },
+    { id:'phrase_in_head', type:'longtext', label:'A phrase you keep hearing in your head', placeholder:'the one that won\'t leave', weight:'heavy' },
+    { id:'pattern_others',  type:'longtext', label:'A pattern you keep seeing in others', weight:'heavy' },
+    { id:'pattern_self',    type:'longtext', label:'A pattern you keep seeing in yourself', weight:'heavy' },
+    { id:'small_lie',       type:'longtext', label:'Something you lied about today (gently — a polite "I\'m fine")', weight:'heavy' },
+    { id:'door_not_opened', type:'longtext', label:'The door you didn\'t open',          placeholder:'metaphor or literal', weight:'heavy' },
+    { id:'door_opened',     type:'longtext', label:'The door you did open',              weight:'heavy' },
+    { id:'quiet_observer',  type:'longtext', label:'What would a quiet observer have seen today?', weight:'heavy' },
+    { id:'today_as_film',   type:'longtext', label:'Today as a film — what kind?',        placeholder:'genre, pace, music', weight:'heavy' },
+    { id:'smell_memory',    type:'longtext', label:'A smell that brought you back today', weight:'heavy' },
+    { id:'unanswered_q',    type:'longtext', label:'A question you don\'t want to answer yet', placeholder:'feeds backlog/open_questions', weight:'heavy' },
+    { id:'chapter_title',   type:'longtext', label:'If today were a chapter title…',     weight:'heavy' },
+    { id:'inner_critic',    type:'longtext', label:'Your inner critic\'s one line today', weight:'heavy' },
+    { id:'inner_coach',     type:'longtext', label:'Your inner coach\'s one line today',  weight:'heavy' },
+    { id:'almost_compliment',type:'longtext', label:'The compliment you almost gave',     weight:'heavy' },
+    { id:'compliment_brushed',type:'longtext', label:'The compliment you received and brushed off', weight:'heavy' },
+    { id:'cant_describe',   type:'longtext', label:'The part of today you can\'t quite describe', weight:'heavy' },
+
+    // ----- HEAVY (v1.2 additions) -----
+    { id:'scene_open',       type:'longtext', label:'describe today the way a film about you would open the scene.', placeholder:'// give the camera a place to land.', weight:'heavy' },
+    { id:'compliment_almost',type:'longtext', label:'the compliment you almost gave today — write it as a letter.',  placeholder:'to: ___\n\n…', weight:'heavy' },
+    { id:'defended_today',   type:'longtext', label:'what did you defend today, and was it worth defending?',        placeholder:'what was the cost?', weight:'heavy' },
+    { id:'envy_today',       type:'longtext', label:'someone you envied today — even briefly. why?',                 placeholder:'the small flash you didn\'t say out loud…', weight:'heavy' },
+
+    // ----- MEDIUM (v1.2 additions) -----
+    { id:'smell_today',      type:'shorttext', label:'a smell that brought you somewhere today.', placeholder:'the place it took you…', weight:'medium' },
+  ];
+
+  /* ===========================================================
+     QGEN STASH — Gemini-generated questions, stashed in localStorage.
+     The pool feeds pickQuestions() so reroll silently draws from
+     fresh LLM questions in addition to the QBANK. Refilled in
+     background; user never sees a "running low" prompt.
+     =========================================================== */
+  const QGEN_STASH_KEY     = 'lifeOs.qgenStash';
+  const QGEN_LASTFETCH_KEY = 'lifeOs.qgenLastFetch';
+  function readQgenStash() {
+    try {
+      const raw = localStorage.getItem(QGEN_STASH_KEY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr.filter(q => q && q.id && q.weight) : [];
+    } catch (e) { return []; }
+  }
+  function writeQgenStash(arr) {
+    try { localStorage.setItem(QGEN_STASH_KEY, JSON.stringify(arr.slice(-30))); } catch (e) {}
+  }
+  function findQMeta(id) {
+    return QBANK.find(b => b.id === id) || readQgenStash().find(b => b.id === id) || null;
+  }
+
+  /* ===========================================================
+     PICK QUESTIONS — core + wild, with caps + anti-monotony.
+     =========================================================== */
+  const HEAVY_HISTORY_KEY = 'lifeOs.heavyHistory';
+  function readHeavyHistory() {
+    try {
+      const raw = localStorage.getItem(HEAVY_HISTORY_KEY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function recentHeavyIds() {
+    const arr = readHeavyHistory();
+    const cutoff = new Date(today);
+    cutoff.setDate(cutoff.getDate() - 14);
+    const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth()+1).padStart(2,'0')}-${String(cutoff.getDate()).padStart(2,'0')}`;
+    return new Set(arr.filter(h => h.date >= cutoffStr && h.date !== dateStr).map(h => h.heavyId));
+  }
+
+  function pickQuestions() {
+    const coreQs = CORE_IDS.map(id => QBANK.find(q => q.id === id));
+
+    // Merge QBANK with the silent qgen stash so reroll cycles include
+    // Gemini-generated questions without any visible "running low" UI.
+    const stash = readQgenStash();
+    const stashLight  = stash.filter(q => q.weight === 'light'  && !q.core);
+    const stashMedium = stash.filter(q => q.weight === 'medium' && !q.core);
+    const stashHeavy  = stash.filter(q => q.weight === 'heavy'  && !q.core);
+
+    const wildLight  = shuffle([...QBANK.filter(q => q.weight === 'light'  && !q.core), ...stashLight]);
+    const wildMedium = shuffle([...QBANK.filter(q => q.weight === 'medium' && !q.core), ...stashMedium]);
+
+    // Anti-monotony: filter heavies seen in past 14 days.
+    const banned = recentHeavyIds();
+    let wildHeavyPool = [
+      ...QBANK.filter(q => q.weight === 'heavy' && !banned.has(q.id)),
+      ...stashHeavy.filter(q => !banned.has(q.id)),
+    ];
+    if (wildHeavyPool.length === 0) wildHeavyPool = QBANK.filter(q => q.weight === 'heavy');
+    const wildHeavy = shuffle(wildHeavyPool);
+
+    const lightN  = 2 + Math.floor(rng() * 2); // 2-3
+    const mediumN = 2 + Math.floor(rng() * 2); // 2-3
+
+    let lights  = wildLight.slice(0, lightN);
+    let mediums = wildMedium.slice(0, mediumN);
+    const heavy = wildHeavy[0];
+
+    // Cap emoji-type questions to ≤1/day across the entire selection.
+    function capEmoji(qs, replacementPool) {
+      let seen = 0;
+      const out = [];
+      const usedIds = new Set(qs.map(q => q.id));
+      for (const q of qs) {
+        if (q.type === 'emoji') {
+          seen += 1;
+          if (seen > 1) {
+            // Find a replacement non-emoji light from the pool that's not already used.
+            const replacement = replacementPool.find(r => r.type !== 'emoji' && !usedIds.has(r.id));
+            if (replacement) {
+              usedIds.add(replacement.id);
+              out.push(replacement);
+              continue;
+            }
+            // No replacement available — drop this emoji question.
+            continue;
+          }
+        }
+        out.push(q);
+      }
+      return out;
+    }
+
+    // Apply emoji cap across lights + mediums together. Pull replacements from the wildLight tail.
+    const combinedRest = [...lights, ...mediums];
+    const restReplacePool = wildLight.slice(lightN); // unused lights, non-emoji preferred
+    const cappedRest = capEmoji(combinedRest, restReplacePool);
+
+    // Re-split capped rest back into lights+mediums (preserve order by weight tag)
+    const cappedLights  = cappedRest.filter(q => q.weight === 'light');
+    const cappedMediums = cappedRest.filter(q => q.weight === 'medium');
+
+    // Assembly order:
+    //  [core mood, core energy, ...wildLights, ...wildMediums, core oneliner, heavy]
+    const moodQ     = coreQs[0]; // mood
+    const energyQ   = coreQs[1]; // energy
+    const onelinerQ = coreQs[2]; // oneliner
+
+    const ordered = [moodQ, energyQ, ...cappedLights, ...cappedMediums, onelinerQ];
+    if (heavy) ordered.push(heavy);
+    return ordered;
+  }
+  let todayQuestions = pickQuestions();
+
+  /* ===========================================================
+     HISTORY (localStorage).
+     =========================================================== */
+  const HISTORY_KEY = 'lifeOs.history';
+  function readHistory() {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function writeHistory(arr) {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(arr.slice(-90)));
+  }
+  const history = readHistory();
+  const last7 = history.filter(h => h.date !== dateStr).slice(-7);
+
+  /* ===========================================================
+     SPARKLINE (7-day mood).
+     =========================================================== */
+  (function drawSpark() {
+    const line = document.getElementById('spark-line');
+    if (!last7.length) {
+      line.setAttribute('points', '4,12 76,12');
+      line.setAttribute('stroke-dasharray', '2 3');
+      line.setAttribute('opacity', '0.3');
+      return;
+    }
+    const moods = last7.map(h => typeof h.mood === 'number' ? h.mood : 5);
+    const W = 80, H = 24, PAD = 4;
+    const n = moods.length;
+    const pts = moods.map((m, i) => {
+      const x = n === 1 ? W/2 : PAD + (i * (W - 2*PAD) / (n - 1));
+      const y = H - PAD - (m / 10) * (H - 2*PAD);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    line.setAttribute('points', pts);
+  })();
+
+  /* ===========================================================
+     PAST-DAY CHIPS.
+     =========================================================== */
+  (function renderChips() {
+    const host = document.getElementById('past-chips');
+    const recent = history.filter(h => h.date !== dateStr).slice(-3).reverse();
+    if (!recent.length) {
+      host.innerHTML = '<span class="day-chip" title="no past entries yet">— no past days —</span>';
+      return;
+    }
+    recent.forEach(d => {
+      const el = document.createElement('span');
+      el.className = 'day-chip';
+      const tip = `${d.date}${d.oneliner ? ' · ' + d.oneliner : ''}`;
+      el.title = tip;
+      const sw = document.createElement('span');
+      sw.className = 'sw';
+      sw.style.background = d.color || 'transparent';
+      el.appendChild(sw);
+      const tx = document.createElement('span');
+      const shortDate = (d.date || '').slice(5).replace('-', '/');
+      tx.textContent = `${shortDate}${d.emoji ? ' ' + d.emoji : ''}`;
+      el.appendChild(tx);
+      host.appendChild(el);
+    });
+  })();
+
+  /* ===========================================================
+     QUESTION RENDERING.
+     =========================================================== */
+  const values = {};
+  const form = document.getElementById('form');
+
+  // Track recent activity so animations can be reactive.
+  let lastInteraction = performance.now();
+  function bumpInteraction() { lastInteraction = performance.now(); }
+
+  function renderQuestion(q) {
+    const wrap = document.createElement('div');
+    wrap.className = 'q' + (q.core ? ' core' : '') + (q.weight ? ' weight-' + q.weight : '');
+    wrap.dataset.qid = q.id;
+
+    // Heavy-block separator label — sits above the heavy widget so it
+    // visually announces itself as a different weight class.
+    if (q.weight === 'heavy') {
+      const sep = document.createElement('div');
+      sep.className = 'heavy-sep';
+      sep.textContent = '// heavy ─────────────────────────────';
+      wrap.appendChild(sep);
+    }
+
+    const handle = document.createElement('span');
+    handle.className = 'drag';
+    handle.textContent = '⋮';
+    handle.title = 'drag to reorder';
+    handle.setAttribute('draggable', 'true');
+    wrap.appendChild(handle);
+
+    const label = document.createElement('div');
+    label.className = 'q-label';
+    label.textContent = q.label;
+    wrap.appendChild(label);
+
+    if      (q.type === 'slider')    renderSlider(q, wrap);
+    else if (q.type === 'emoji')     renderEmoji(q, wrap);
+    else if (q.type === 'tags')      renderTags(q, wrap);
+    else if (q.type === 'choice')    renderChoice(q, wrap);
+    else if (q.type === 'stars')     renderStars(q, wrap);
+    else if (q.type === 'color')     renderColor(q, wrap);
+    else if (q.type === 'number')    renderNumber(q, wrap);
+    else if (q.type === 'shorttext') renderShort(q, wrap);
+    else if (q.type === 'longtext')  renderLong(q, wrap);
+    else if (q.type === 'timeline')  renderTimeline(q, wrap);
+
+    return wrap;
+  }
+
+  function renderSlider(q, wrap) {
+    const mid = Math.round((q.min + q.max) / 2);
+    values[q.id] = mid;
+
+    const slWrap = document.createElement('div');
+    slWrap.className = 'slider-wrap';
+
+    const rail = document.createElement('div');
+    rail.className = 'slider-rail';
+
+    const fill = document.createElement('div');
+    fill.className = 'slider-fill';
+    rail.appendChild(fill);
+
+    last7.forEach(h => {
+      if (h.values && typeof h.values[q.id] === 'number') {
+        const pct = ((h.values[q.id] - q.min) / (q.max - q.min)) * 100;
+        if (pct >= 0 && pct <= 100) {
+          const g = document.createElement('div');
+          g.className = 'slider-ghost';
+          g.style.left = pct + '%';
+          g.title = `${h.date}: ${h.values[q.id]}`;
+          rail.appendChild(g);
+        }
+      }
+    });
+
+    const thumb = document.createElement('div');
+    thumb.className = 'slider-thumb';
+    rail.appendChild(thumb);
+
+    const valEl = document.createElement('div');
+    valEl.className = 'slider-value';
+    valEl.appendChild(document.createTextNode(mid + ' '));
+    const denom = document.createElement('span');
+    denom.className = 'denom';
+    denom.textContent = `/ ${q.max}`;
+    valEl.appendChild(denom);
+
+    function setVal(v) {
+      v = Math.max(q.min, Math.min(q.max, v));
+      v = Math.round(v);
+      values[q.id] = v;
+      const pct = ((v - q.min) / (q.max - q.min)) * 100;
+      fill.style.width = pct + '%';
+      thumb.style.left = pct + '%';
+      valEl.firstChild.textContent = v + ' ';
+      bumpInteraction();
+    }
+
+    function ptrUpdate(ev) {
+      const rect = rail.getBoundingClientRect();
+      const x = ev.clientX - rect.left;
+      const pct = Math.max(0, Math.min(1, x / rect.width));
+      setVal(q.min + pct * (q.max - q.min));
+    }
+
+    rail.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      rail.setPointerCapture(ev.pointerId);
+      ptrUpdate(ev);
+      const move = (e) => ptrUpdate(e);
+      const up = () => {
+        rail.removeEventListener('pointermove', move);
+        rail.removeEventListener('pointerup', up);
+        rail.removeEventListener('pointercancel', up);
+      };
+      rail.addEventListener('pointermove', move);
+      rail.addEventListener('pointerup', up);
+      rail.addEventListener('pointercancel', up);
+    });
+
+    slWrap.appendChild(rail);
+
+    const ends = document.createElement('div');
+    ends.className = 'slider-ends';
+    ends.innerHTML = `<span>${q.leftLabel}</span><span>${q.rightLabel}</span>`;
+    slWrap.appendChild(ends);
+    slWrap.appendChild(valEl);
+
+    wrap.appendChild(slWrap);
+    setVal(mid);
+  }
+
+  function renderEmoji(q, wrap) {
+    values[q.id] = null;
+    const row = document.createElement('div');
+    row.className = 'emoji-row' + (q.mono ? ' mono' : '');
+
+    const counts = {};
+    history.forEach(h => {
+      if (h.values && typeof h.values[q.id] === 'string') {
+        counts[h.values[q.id]] = (counts[h.values[q.id]] || 0) + 1;
+      }
+    });
+
+    q.options.forEach(em => {
+      const cell = document.createElement('div');
+      cell.className = 'emoji-cell';
+
+      const span = document.createElement('span');
+      span.className = 'emoji';
+      span.textContent = em;
+      span.addEventListener('click', () => {
+        row.querySelectorAll('.emoji').forEach(s => s.classList.remove('selected'));
+        span.classList.add('selected');
+        values[q.id] = em;
+        bumpInteraction();
+      });
+      cell.appendChild(span);
+
+      const c = document.createElement('span');
+      c.className = 'emoji-count';
+      c.textContent = counts[em] ? `×${counts[em]}` : '·';
+      cell.appendChild(c);
+
+      row.appendChild(cell);
+    });
+    wrap.appendChild(row);
+  }
+
+  function renderTags(q, wrap) {
+    values[q.id] = [];
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    q.options.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'tag';
+      btn.textContent = opt;
+      btn.addEventListener('click', () => {
+        if (values[q.id].includes(opt)) {
+          values[q.id] = values[q.id].filter(t => t !== opt);
+          btn.classList.remove('selected');
+        } else {
+          values[q.id].push(opt);
+          btn.classList.add('selected');
+        }
+        bumpInteraction();
+      });
+      row.appendChild(btn);
+    });
+    wrap.appendChild(row);
+  }
+
+  function renderChoice(q, wrap) {
+    values[q.id] = null;
+    const row = document.createElement('div');
+    row.className = 'choice-row';
+    q.options.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'choice';
+      btn.textContent = opt;
+      btn.addEventListener('click', () => {
+        row.querySelectorAll('.choice').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        values[q.id] = opt;
+        bumpInteraction();
+      });
+      row.appendChild(btn);
+    });
+    wrap.appendChild(row);
+  }
+
+  function renderStars(q, wrap) {
+    values[q.id] = 0;
+    const row = document.createElement('div');
+    row.className = 'stars';
+    const stars = [];
+    for (let i = 1; i <= q.max; i++) {
+      const s = document.createElement('span');
+      s.className = 'star';
+      s.textContent = '★';
+      s.addEventListener('mouseenter', () => {
+        stars.forEach((st, idx) => st.classList.toggle('hover', idx < i && !st.classList.contains('lit')));
+      });
+      s.addEventListener('mouseleave', () => {
+        stars.forEach(st => st.classList.remove('hover'));
+      });
+      s.addEventListener('click', () => {
+        values[q.id] = i;
+        stars.forEach((st, idx) => {
+          st.classList.toggle('lit', idx < i);
+          st.classList.remove('hover');
+        });
+        bumpInteraction();
+      });
+      stars.push(s);
+      row.appendChild(s);
+    }
+    wrap.appendChild(row);
+  }
+
+  function renderColor(q, wrap) {
+    values[q.id] = '#888888';
+    const pickerWrap = document.createElement('div');
+    pickerWrap.className = 'color-pick';
+
+    const lab = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.value = '#888888';
+    const swatch = document.createElement('span');
+    swatch.className = 'color-swatch';
+    swatch.style.background = '#888888';
+    const hex = document.createElement('span');
+    hex.className = 'color-hex';
+    hex.textContent = '#888888';
+    input.addEventListener('input', e => {
+      values[q.id] = e.target.value;
+      swatch.style.background = e.target.value;
+      hex.textContent = e.target.value;
+      bumpInteraction();
+    });
+    lab.appendChild(input);
+    lab.appendChild(swatch);
+    lab.appendChild(hex);
+    pickerWrap.appendChild(lab);
+    wrap.appendChild(pickerWrap);
+
+    const past = last7.map(h => h.values && h.values[q.id]).filter(Boolean);
+    if (past.length) {
+      const strip = document.createElement('div');
+      strip.className = 'past-strip';
+      past.forEach((c, i) => {
+        const d = document.createElement('span');
+        d.className = 'pc';
+        d.style.background = c;
+        d.title = `${last7[i] ? last7[i].date : ''}: ${c}`;
+        strip.appendChild(d);
+      });
+      wrap.appendChild(strip);
+    }
+  }
+
+  function renderNumber(q, wrap) {
+    values[q.id] = q.default;
+    const row = document.createElement('div');
+    row.className = 'stepper';
+    const minus = document.createElement('button');
+    minus.type = 'button';
+    minus.textContent = '−';
+    const num = document.createElement('span');
+    num.className = 'num';
+    num.textContent = q.default;
+    const plus = document.createElement('button');
+    plus.type = 'button';
+    plus.textContent = '+';
+    const upd = (delta) => {
+      const next = Math.round((values[q.id] + delta) * 10) / 10;
+      if (next < q.min || next > q.max) return;
+      values[q.id] = next;
+      num.textContent = next;
+      bumpInteraction();
+    };
+    minus.addEventListener('click', () => upd(-q.step));
+    plus.addEventListener('click', () => upd(q.step));
+    row.appendChild(minus); row.appendChild(num); row.appendChild(plus);
+    wrap.appendChild(row);
+  }
+
+  function renderShort(q, wrap) {
+    values[q.id] = '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'text-input';
+    input.placeholder = q.placeholder || '';
+    input.addEventListener('input', e => {
+      values[q.id] = e.target.value;
+      pulseCaret();
+      bumpInteraction();
+    });
+    wrap.appendChild(input);
+  }
+
+  // Word-count thresholds that flash the counter.
+  const WC_THRESHOLDS = [50, 100, 250, 500];
+
+  function renderLong(q, wrap) {
+    values[q.id] = '';
+    const isHeavy = q.weight === 'heavy';
+    const lw = document.createElement('div');
+    lw.className = 'long-wrap' + (isHeavy ? ' long-heavy' : '');
+    const ta = document.createElement('textarea');
+    ta.className = 'long-input' + (isHeavy ? ' long-input-heavy' : '');
+    ta.placeholder = isHeavy
+      ? '// no rules. write to depth.'
+      : (q.placeholder || '// no rules. just write.');
+    const wc = document.createElement('span');
+    wc.className = 'word-count' + (isHeavy ? ' word-count-heavy' : '');
+    wc.textContent = '0 / ∞';
+    let lastWords = 0;
+    ta.addEventListener('input', e => {
+      values[q.id] = e.target.value;
+      const words = e.target.value.trim().split(/\s+/).filter(Boolean).length;
+      wc.textContent = `${words} / ∞`;
+      // threshold flash
+      for (const t of WC_THRESHOLDS) {
+        if (lastWords < t && words >= t) {
+          wc.classList.add('over-50'); // reuse accent class
+          setTimeout(() => { if (words < 50) wc.classList.remove('over-50'); }, 1500);
+          break;
+        }
+      }
+      // keep the over-50 always-on rule too (it's what the token expects)
+      wc.classList.toggle('over-50', words > 50);
+      lastWords = words;
+      pulseCaret();
+      bumpInteraction();
+    });
+    lw.appendChild(ta);
+    lw.appendChild(wc);
+    wrap.appendChild(lw);
+  }
+
+  function renderTimeline(q, wrap) {
+    values[q.id] = {};
+    q.segments.forEach(seg => {
+      values[q.id][seg] = '';
+      const segWrap = document.createElement('div');
+      segWrap.className = 'timeline-seg';
+      const segLabel = document.createElement('div');
+      segLabel.className = 'timeline-seg-label';
+      segLabel.textContent = seg;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'text-input';
+      input.placeholder = `one line for ${seg}…`;
+      input.addEventListener('input', e => {
+        values[q.id][seg] = e.target.value;
+        pulseCaret();
+        bumpInteraction();
+      });
+      segWrap.appendChild(segLabel);
+      segWrap.appendChild(input);
+      wrap.appendChild(segWrap);
+    });
+  }
+
+  /* ===========================================================
+     PERSISTED ORDER + DRAG REORDER.
+     =========================================================== */
+  const ORDER_KEY = 'lifeOs.order.' + dateStr + '.' + rerollN;
+  function applyPersistedOrder(qs) {
+    try {
+      const raw = localStorage.getItem(ORDER_KEY);
+      if (!raw) return qs;
+      const order = JSON.parse(raw);
+      if (!Array.isArray(order)) return qs;
+      const byId = new Map(qs.map(q => [q.id, q]));
+      const out = [];
+      order.forEach(id => { if (byId.has(id)) { out.push(byId.get(id)); byId.delete(id); } });
+      byId.forEach(q => out.push(q));
+      return out;
+    } catch (e) { return qs; }
+  }
+  todayQuestions = applyPersistedOrder(todayQuestions);
+  todayQuestions.forEach(q => form.appendChild(renderQuestion(q)));
+
+  let dragSrc = null;
+  form.addEventListener('dragstart', (ev) => {
+    if (!ev.target.classList || !ev.target.classList.contains('drag')) return;
+    const block = ev.target.closest('.q');
+    if (!block) return;
+    dragSrc = block;
+    block.classList.add('dragging');
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', block.dataset.qid);
+  });
+  form.addEventListener('dragend', () => {
+    if (dragSrc) dragSrc.classList.remove('dragging');
+    form.querySelectorAll('.q').forEach(q => q.classList.remove('drop-target'));
+    dragSrc = null;
+  });
+  form.addEventListener('dragover', (ev) => {
+    if (!dragSrc) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    const target = ev.target.closest('.q');
+    form.querySelectorAll('.q').forEach(q => q.classList.remove('drop-target'));
+    if (target && target !== dragSrc) target.classList.add('drop-target');
+  });
+  form.addEventListener('drop', (ev) => {
+    if (!dragSrc) return;
+    ev.preventDefault();
+    const target = ev.target.closest('.q');
+    if (target && target !== dragSrc) {
+      const rect = target.getBoundingClientRect();
+      const before = (ev.clientY - rect.top) < rect.height / 2;
+      target.parentNode.insertBefore(dragSrc, before ? target : target.nextSibling);
+      const newOrder = Array.from(form.querySelectorAll('.q')).map(q => q.dataset.qid);
+      localStorage.setItem(ORDER_KEY, JSON.stringify(newOrder));
+    }
+    form.querySelectorAll('.q').forEach(q => q.classList.remove('drop-target'));
+  });
+
+  /* ===========================================================
+     REROLL.  Two-click confirm when the form has typed answers,
+     so an accidental click doesn't wipe what the user just wrote.
+     =========================================================== */
+  let formDirty = false;
+  function markFormDirty() { formDirty = true; }
+  form.addEventListener('input', markFormDirty);
+  form.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest('.q')) markFormDirty();
+  });
+
+  let rerollConfirmTimer = null;
+  function doRerollNow() {
+    const u = new URL(location.href);
+    const cur = parseInt(u.searchParams.get('reroll') || '0', 10);
+    u.searchParams.set('reroll', String(cur + 1));
+    location.href = u.toString();
+  }
+  function reroll() {
+    const btn = document.getElementById('reroll');
+    // already in confirm window — fire the actual reroll
+    if (rerollConfirmTimer) {
+      clearTimeout(rerollConfirmTimer);
+      rerollConfirmTimer = null;
+      doRerollNow();
+      return;
+    }
+    // clean form, no dirty answers → reroll immediately
+    if (!formDirty) {
+      doRerollNow();
+      return;
+    }
+    // dirty: arm a 4-second confirm window
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="kbd">⚠</span>click again — this wipes your answers';
+    btn.classList.add('reroll-warn');
+    rerollConfirmTimer = setTimeout(() => {
+      rerollConfirmTimer = null;
+      btn.innerHTML = originalHTML;
+      btn.classList.remove('reroll-warn');
+    }, 4000);
+  }
+  document.getElementById('reroll').addEventListener('click', reroll);
+
+  /* ===========================================================
+     SAVE FLOW + BLOB DOWNLOAD + SERVER.
+     =========================================================== */
+  const saveBtn   = document.getElementById('save');
+  const saveStamp = document.getElementById('save-stamp');
+  const feedback  = document.getElementById('feedback');
+  const latencyEl = document.getElementById('latency');
+  const sourceEl  = document.getElementById('source-name');
+
+  function buildEntry() {
+    return {
+      date: dateStr,
+      weekday,
+      accent: { name: accent.name, hex: accent.hex },
+      saved_at: new Date().toISOString(),
+      reroll: rerollN,
+      order: Array.from(form.querySelectorAll('.q')).map(q => q.dataset.qid),
+      questions: todayQuestions.map(q => {
+        const base = { id: q.id, type: q.type, label: q.label, value: values[q.id] };
+        if (q.type === 'slider')   Object.assign(base, { min: q.min, max: q.max, leftLabel: q.leftLabel, rightLabel: q.rightLabel });
+        if (q.type === 'emoji' || q.type === 'tags' || q.type === 'choice') base.options = q.options;
+        if (q.type === 'stars')    base.max = q.max;
+        if (q.type === 'timeline') base.segments = q.segments;
+        return base;
+      }),
+      source: 'today.html',
+    };
+  }
+
+  function buildHistoryRow(entry) {
+    const v = {};
+    entry.questions.forEach(q => { v[q.id] = q.value; });
+    const oneliner = v.oneliner || v.win || v.stuck || v.three_words || '';
+    const mood = (typeof v.mood === 'number') ? v.mood
+                : (typeof v.energy === 'number') ? Math.round(v.energy / 10)
+                : null;
+    return {
+      date: entry.date,
+      mood: mood,
+      color: v.color || entry.accent.hex,
+      accent_name: entry.accent.name,
+      emoji: v.weather_in || v.animal || v.plant || v.face || '',
+      oneliner: oneliner,
+      values: v
+    };
+  }
+
+  function appendHistory(entry) {
+    const row = buildHistoryRow(entry);
+    const arr = readHistory().filter(h => h.date !== entry.date);
+    arr.push(row);
+    arr.sort((a, b) => a.date.localeCompare(b.date));
+    writeHistory(arr);
+  }
+
+  function appendHeavyHistory(entry) {
+    const heavyQ = entry.questions.find(q => {
+      const meta = findQMeta(q.id);
+      return meta && meta.weight === 'heavy';
+    });
+    if (!heavyQ) return;
+    const arr = readHeavyHistory().filter(h => h.date !== entry.date);
+    arr.push({ date: entry.date, heavyId: heavyQ.id });
+    localStorage.setItem(HEAVY_HISTORY_KEY, JSON.stringify(arr.slice(-60)));
+  }
+
+  function computeStreak(arr) {
+    if (!arr || !arr.length) return 0;
+    const dates = new Set(arr.map(h => h.date));
+    let streak = 0;
+    const cur = new Date();
+    while (true) {
+      const k = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`;
+      if (dates.has(k)) { streak++; cur.setDate(cur.getDate() - 1); }
+      else break;
+    }
+    return streak;
+  }
+
+  function ruleBasedFallback() {
+    const hist = readHistory();
+    const streak = computeStreak(hist);
+    // color_count counts unique accent NAMES, not hex picks (per spec).
+    const accentNames = new Set(hist.map(h => h.accent_name).filter(Boolean));
+    return {
+      english: [],
+      reflect: [], // rules engine has no reflect
+      gamification: { streak, color_count: accentNames.size, new_badge: null },
+      patterns: hist.length < 3
+        ? ['not enough history yet — keep going']
+        : ['you keep showing up. that\'s the whole game.'],
+      prompt_for_tomorrow: 'try writing the heavy entry in 3 sentences only.',
+      meta: { source: 'rules', latency_ms: 0 }
+    };
+  }
+
+  function downloadEntryBlob(entry) {
+    try {
+      const blob = new Blob([JSON.stringify(entry, null, 2)], { type: 'application/json' });
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = u;
+      a.download = `journal-${entry.date}.json`;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // revoke after a tick so the download has time to register
+      setTimeout(() => URL.revokeObjectURL(u), 1000);
+    } catch (e) { /* silent — not critical */ }
+  }
+
+  async function tryServer(entry, signal) {
+    const res = await fetch('http://localhost:5757/api/journal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entry }),
+      signal,
+    });
+    if (!res.ok) throw new Error('bad status');
+    return res.json();
+  }
+
+  function renderFeedback(fb, latencyMs) {
+    // latency: prefer server-reported meta.latency_ms when available.
+    const lat = (fb.meta && typeof fb.meta.latency_ms === 'number')
+      ? fb.meta.latency_ms
+      : latencyMs;
+    latencyEl.textContent = (lat / 1000).toFixed(1) + 's';
+
+    // source name
+    const src = (fb.meta && fb.meta.source) || 'local';
+    sourceEl.textContent = src;
+
+    // english
+    const eList = document.getElementById('fb-english-list');
+    eList.innerHTML = '';
+    const eng = Array.isArray(fb.english) ? fb.english : [];
+    if (!eng.length) {
+      const empty = document.createElement('div');
+      empty.className = 'eng-note';
+      empty.textContent = '// no upgrades for today — your writing is clean (or there was nothing long enough to read).';
+      eList.appendChild(empty);
+    } else {
+      eng.forEach((u, idx) => {
+        const row = document.createElement('div');
+        row.className = 'eng-item';
+        row.dataset.channel = 'english';
+        row.dataset.idx = String(idx);
+        row.dataset.snapshot = u.suggested || u.original || '';
+        row.tabIndex = 0;
+        const orig = document.createElement('span'); orig.className = 'eng-orig'; orig.textContent = u.original || '';
+        const arr  = document.createElement('span'); arr.className  = 'eng-arrow'; arr.textContent  = '→';
+        const upg  = document.createElement('span'); upg.className  = 'eng-upg';   upg.textContent  = u.suggested || '';
+        row.appendChild(orig); row.appendChild(arr); row.appendChild(upg);
+        if (u.note) {
+          const note = document.createElement('span'); note.className = 'eng-note';  note.textContent = u.note || '';
+          row.appendChild(note);
+        }
+        attachReplyAffordance(row, 'english', idx, row.dataset.snapshot);
+        eList.appendChild(row);
+      });
+    }
+
+    // reflect (substantive observations) — hide entirely if empty / fallback.
+    const reflectBlock = document.getElementById('fb-reflect');
+    const rList = document.getElementById('fb-reflect-list');
+    rList.innerHTML = '';
+    const ref = Array.isArray(fb.reflect) ? fb.reflect : [];
+    if (!ref.length) {
+      reflectBlock.hidden = true;
+    } else {
+      reflectBlock.hidden = false;
+      ref.forEach((r, idx) => {
+        const li = document.createElement('li');
+        li.className = 'reflect-item';
+        li.dataset.channel = 'reflect';
+        li.dataset.idx = String(idx);
+        li.dataset.snapshot = r.observation || '';
+        li.tabIndex = 0;
+        const row = document.createElement('div');
+        row.className = 'reflect-row';
+        const obs = document.createElement('div');
+        obs.className = 'reflect-obs';
+        obs.textContent = r.observation || '';
+        const kind = document.createElement('span');
+        kind.className = 'reflect-kind';
+        kind.textContent = r.kind ? `[${r.kind}]` : '';
+        row.appendChild(obs);
+        row.appendChild(kind);
+        li.appendChild(row);
+        if (Array.isArray(r.evidence) && r.evidence.length) {
+          r.evidence.forEach(ev => {
+            const ed = document.createElement('div');
+            ed.className = 'reflect-evidence';
+            const dateSp = document.createElement('span');
+            dateSp.className = 'ev-date';
+            dateSp.textContent = `from ${ev.source_date || '—'}:`;
+            const quoteSp = document.createElement('span');
+            quoteSp.className = 'ev-quote';
+            quoteSp.textContent = `"${ev.quote || ''}"`;
+            ed.appendChild(dateSp);
+            ed.appendChild(quoteSp);
+            li.appendChild(ed);
+          });
+        }
+        attachReplyAffordance(li, 'reflect', idx, li.dataset.snapshot);
+        rList.appendChild(li);
+      });
+    }
+
+    // gamification
+    const gRow = document.getElementById('fb-gam-row');
+    gRow.innerHTML = '';
+    const gam = fb.gamification || {};
+    function gamItem(num, label) {
+      const w = document.createElement('div'); w.className = 'gam-item';
+      const n = document.createElement('div'); n.className = 'gam-num'; n.textContent = num;
+      const l = document.createElement('div'); l.className = 'gam-label'; l.textContent = label;
+      w.appendChild(n); w.appendChild(l);
+      return w;
+    }
+    if (gam.streak !== undefined)      gRow.appendChild(gamItem(gam.streak + 'd', 'streak'));
+    if (gam.color_count !== undefined) gRow.appendChild(gamItem(gam.color_count, 'colors'));
+    // server returns gam.new_badge (NOT gam.badge)
+    if (gam.new_badge) {
+      const b = document.createElement('div');
+      b.className = 'gam-badge';
+      b.textContent = gam.new_badge;
+      gRow.appendChild(b);
+    }
+
+    // patterns
+    const pList = document.getElementById('fb-pat-list');
+    pList.innerHTML = '';
+    (fb.patterns || []).forEach(p => {
+      const li = document.createElement('li');
+      li.textContent = p;
+      pList.appendChild(li);
+    });
+
+    // prompt for tomorrow
+    document.getElementById('fb-prompt-text').textContent = fb.prompt_for_tomorrow || '';
+
+    feedback.classList.add('open');
+
+    // v1.2: rehydrate any existing conversation thread under its anchors.
+    loadConversationThread();
+  }
+
+  // paste-render — does NOT mutate textarea contents; surfaces error as a sibling.
+  document.getElementById('paste-render').addEventListener('click', () => {
+    const ta = document.getElementById('paste-area');
+    const err = document.getElementById('paste-err');
+    err.textContent = '';
+    try {
+      const fb = JSON.parse(ta.value);
+      renderFeedback(fb, 0);
+      document.getElementById('paste-wrap').open = false;
+    } catch (e) {
+      err.textContent = '// invalid json';
+    }
+  });
+
+  // After a successful save, any subsequent edit should re-enable the button.
+  // Without this, the form is "locked" by the .saved class and the user gets stuck.
+  function markDirtyForResave() {
+    if (!saveBtn.classList.contains('saved')) return;
+    saveBtn.classList.remove('saved', 'fade-glow');
+    saveBtn.innerHTML = '$ <span class="caret">▍</span>update_today';
+    saveStamp.textContent = '// unsaved changes';
+    saveStamp.classList.add('shown');
+  }
+  // Catch any interaction inside the form (inputs, sliders, emoji clicks, etc.)
+  form.addEventListener('input', markDirtyForResave);
+  form.addEventListener('click', markDirtyForResave);
+
+  async function save() {
+    if (saveBtn.classList.contains('processing') || saveBtn.classList.contains('saved')) return;
+
+    saveBtn.classList.add('processing');
+    saveBtn.innerHTML = '... processing 0.0s';
+    const t0 = performance.now();
+
+    // live elapsed counter
+    const tick = setInterval(() => {
+      const s = ((performance.now() - t0) / 1000).toFixed(1);
+      saveBtn.innerHTML = `... processing ${s}s`;
+    }, 100);
+
+    const entry = buildEntry();
+    // persist locally first
+    localStorage.setItem('lifeOs.lastEntry', JSON.stringify(entry));
+    appendHistory(entry);
+    appendHeavyHistory(entry);
+
+    // download JSON to ~/Downloads via Blob (Option B/C feeder mechanism)
+    downloadEntryBlob(entry);
+
+    const minDelay = new Promise(r => setTimeout(r, 600));
+
+    let fb = null;
+    try {
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), 2000);
+      const result = await tryServer(entry, ctrl.signal);
+      clearTimeout(timeoutId);
+      fb = result;
+    } catch (e) {
+      // silent — fall through
+    }
+
+    await minDelay;
+    clearInterval(tick);
+
+    saveBtn.classList.remove('processing');
+    saveBtn.classList.add('saved');
+    saveBtn.innerHTML = '✓ saved';
+
+    // no duplicate ✓ in stamp
+    saveStamp.textContent = `entry committed · ${lifeOs.formatTime(new Date())}`;
+    saveStamp.classList.add('shown');
+
+    setTimeout(() => saveBtn.classList.add('fade-glow'), 250);
+
+    const elapsed = performance.now() - t0;
+
+    document.getElementById('raw-json').textContent = JSON.stringify(entry, null, 2);
+
+    if (fb) {
+      renderFeedback(fb, elapsed);
+    } else {
+      const local = ruleBasedFallback();
+      renderFeedback(local, elapsed);
+      document.getElementById('paste-wrap').open = true;
+    }
+  }
+  saveBtn.addEventListener('click', save);
+
+  /* ===========================================================
+     KEYBOARD SHORTCUTS + CHEATSHEET.
+     =========================================================== */
+  const cheat = document.getElementById('cheat');
+  function toggleCheat(force) {
+    if (force === true)       cheat.classList.add('open');
+    else if (force === false) cheat.classList.remove('open');
+    else                      cheat.classList.toggle('open');
+  }
+  document.getElementById('close-cheat').addEventListener('click', () => toggleCheat(false));
+  document.getElementById('cheat-toggle').addEventListener('click', () => toggleCheat());
+
+  document.addEventListener('keydown', (ev) => {
+    const meta = ev.metaKey || ev.ctrlKey;
+    if (meta && ev.key.toLowerCase() === 's') {
+      ev.preventDefault();
+      save();
+      return;
+    }
+    if (meta && ev.key === '/') {
+      ev.preventDefault();
+      toggleCheat();
+      return;
+    }
+    if (meta && ev.key.toLowerCase() === 't') {
+      ev.preventDefault();
+      location.href = 'archive.html';
+      return;
+    }
+    if (meta && ev.key.toLowerCase() === 'b') {
+      ev.preventDefault();
+      location.href = 'write.html';
+      return;
+    }
+    if (meta && ev.key.toLowerCase() === 'p') {
+      ev.preventDefault();
+      const pw = document.getElementById('paste-wrap');
+      pw.open = !pw.open;
+      if (pw.open) document.getElementById('paste-area').focus();
+      return;
+    }
+    if (ev.key === 'Escape') {
+      if (cheat.classList.contains('open')) { toggleCheat(false); return; }
+      const tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      ev.preventDefault();
+      reroll();
+    }
+  });
+
+  /* ===========================================================
+     REACTIVE ANIMATION LAYER.
+     mouse-follow blob, type-react caret, scroll parallax, idle pulse.
+     All gated on prefers-reduced-motion.
+     =========================================================== */
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Mouse-follow blob (lerp 5%/frame; falls back to drift after 3s of stillness).
+  const blob = document.getElementById('blob');
+  let targetX = 0, targetY = 0, curX = 0, curY = 0;
+  let lastMouseMove = 0;
+  let mouseActive = false;
+
+  if (!reduceMotion) {
+    window.addEventListener('pointermove', (e) => {
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      // Translate offset, capped at ±120px so the blob never flies off-screen.
+      targetX = Math.max(-120, Math.min(120, (e.clientX - cx) * 0.15));
+      targetY = Math.max(-120, Math.min(120, (e.clientY - cy) * 0.15));
+      lastMouseMove = performance.now();
+      mouseActive = true;
+      bumpInteraction();
+    });
+
+    function blobLoop() {
+      if (document.hidden) { requestAnimationFrame(blobLoop); return; }
+      // If mouse has been still > 3s, return to drift; otherwise chase.
+      const stillFor = performance.now() - lastMouseMove;
+      if (stillFor > 3000) {
+        // fade target back to 0 (drift animation re-kicks via class)
+        targetX *= 0.95;
+        targetY *= 0.95;
+        if (!blob.classList.contains('drift') && Math.abs(targetX) < 1 && Math.abs(targetY) < 1) {
+          blob.classList.add('drift');
+        }
+      } else {
+        if (blob.classList.contains('drift')) blob.classList.remove('drift');
+      }
+      curX += (targetX - curX) * 0.05;
+      curY += (targetY - curY) * 0.05;
+      blob.style.setProperty('--blob-x', curX.toFixed(1) + 'px');
+      blob.style.setProperty('--blob-y', curY.toFixed(1) + 'px');
+      requestAnimationFrame(blobLoop);
+    }
+    requestAnimationFrame(blobLoop);
+  }
+
+  // Type-react caret pulse — throttled to 8/sec.
+  const caretEl = document.getElementById('caret');
+  let lastPulse = 0;
+  function pulseCaret() {
+    if (reduceMotion) return;
+    const now = performance.now();
+    if (now - lastPulse < 125) return;
+    lastPulse = now;
+    caretEl.classList.add('pulse');
+    setTimeout(() => caretEl.classList.remove('pulse'), 100);
+  }
+
+  // Scroll-tied dot-grid parallax (subtle).
+  if (!reduceMotion) {
+    let scrollTicking = false;
+    window.addEventListener('scroll', () => {
+      if (scrollTicking) return;
+      scrollTicking = true;
+      requestAnimationFrame(() => {
+        const shift = Math.max(-4, Math.min(4, window.scrollY * 0.04));
+        document.documentElement.style.setProperty('--grid-shift', shift.toFixed(1) + 'px');
+        scrollTicking = false;
+      });
+    }, { passive: true });
+  }
+
+  // Idle pulse — every time interaction has been idle > 30s, pulse blob once.
+  if (!reduceMotion) {
+    let lastIdlePulse = performance.now();
+    setInterval(() => {
+      if (document.hidden) return;
+      const idleFor = performance.now() - lastInteraction;
+      const sinceLastIdlePulse = performance.now() - lastIdlePulse;
+      if (idleFor > 30000 && sinceLastIdlePulse > 30000) {
+        // run a one-off scale animation
+        blob.style.transition = 'transform 2500ms cubic-bezier(0.4, 0, 0.2, 1)';
+        blob.style.setProperty('--blob-scale', '1.08');
+        setTimeout(() => {
+          blob.style.setProperty('--blob-scale', '1');
+        }, 1250);
+        setTimeout(() => {
+          blob.style.transition = '';
+        }, 2600);
+        lastIdlePulse = performance.now();
+      }
+    }, 5000);
+  }
+
+  /* ===========================================================
+     v1.2 — CONVERSATION REPLY UI.
+     Each insight item gets a `[ reply ]` affordance that posts to
+     /api/journal/reply and renders threaded turns inline.
+     =========================================================== */
+  const CONVO_KEY = 'lifeOs.conversation.' + dateStr;
+
+  function readConvoCache() {
+    try {
+      const raw = localStorage.getItem(CONVO_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) { return null; }
+  }
+  function writeConvoCache(thread) {
+    try { localStorage.setItem(CONVO_KEY, JSON.stringify(thread)); } catch (e) {}
+  }
+
+  // Build a stable anchor element finder.
+  function findAnchorEl(channel, idx) {
+    const sel = channel === 'reflect'
+      ? `.reflect-item[data-channel="reflect"][data-idx="${idx}"]`
+      : `.eng-item[data-channel="english"][data-idx="${idx}"]`;
+    return document.querySelector(sel);
+  }
+
+  function makeReplyToggle(channel, idx, snapshot) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'reply-toggle';
+    btn.textContent = '[ reply ]';
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const host = btn.closest('.eng-item, .reflect-item, .thread-turn');
+      if (!host) return;
+      const box = host.querySelector(':scope > .reply-box');
+      if (box) toggleReplyBox(box);
+    });
+    return btn;
+  }
+
+  function buildReplyBox(channel, idx, snapshot, parentTurnId) {
+    const box = document.createElement('div');
+    box.className = 'reply-box';
+
+    const ta = document.createElement('textarea');
+    ta.placeholder = '// type a reply — esc to close';
+    box.appendChild(ta);
+
+    const sendRow = document.createElement('div');
+    const send = document.createElement('button');
+    send.type = 'button';
+    send.className = 'reply-send';
+    send.textContent = '[ send ]';
+    const status = document.createElement('span');
+    status.className = 'reply-status';
+    sendRow.appendChild(send);
+    sendRow.appendChild(status);
+    box.appendChild(sendRow);
+
+    const threadWrap = document.createElement('div');
+    threadWrap.className = 'thread-wrap';
+    box.appendChild(threadWrap);
+
+    ta.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') {
+        ev.stopPropagation();
+        toggleReplyBox(box, false);
+      }
+    });
+
+    send.addEventListener('click', async () => {
+      const text = (ta.value || '').trim();
+      if (!text) return;
+      ta.disabled = true;
+      send.disabled = true;
+      status.textContent = '// sending… ';
+      const t0 = performance.now();
+      try {
+        const res = await fetch('http://localhost:5757/api/journal/reply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: dateStr,
+            user_text: text,
+            anchor: { channel: channel, index: idx, snapshot: snapshot },
+            parent_turn_id: parentTurnId || null,
+          }),
+        });
+        const elapsed = performance.now() - t0;
+        if (!res.ok) throw new Error('bad status');
+        const json = await res.json();
+        status.textContent = '';
+
+        // Render the user turn we just sent.
+        renderThreadTurn(threadWrap, {
+          role: 'user',
+          text: text,
+          ts: new Date().toISOString(),
+          source: 'user',
+        }, channel, idx, snapshot);
+
+        // Render the assistant turn returned by server.
+        const at = json.assistant_turn || {};
+        renderThreadTurn(threadWrap, {
+          role: 'assistant',
+          text: at.text || '',
+          ts: at.ts || new Date().toISOString(),
+          source: (at.meta && at.meta.source) || 'gemini',
+          latency_ms: (at.meta && at.meta.latency_ms) || Math.round(elapsed),
+          turn_id: at.turn_id || null,
+        }, channel, idx, snapshot);
+
+        // Cache the updated thread for fast reload.
+        if (json.thread) writeConvoCache(json.thread);
+
+        // Reset the input + re-enable for follow-up replies.
+        ta.value = '';
+        ta.disabled = false;
+        send.disabled = false;
+        toggleReplyBox(box, false);
+      } catch (e) {
+        status.textContent = '// no reply — server unreachable';
+        ta.disabled = false;
+        send.disabled = false;
+      }
+    });
+
+    return box;
+  }
+
+  function attachReplyAffordance(host, channel, idx, snapshot) {
+    const toggle = makeReplyToggle(channel, idx, snapshot);
+    host.appendChild(toggle);
+    const box = buildReplyBox(channel, idx, snapshot, null);
+    host.appendChild(box);
+  }
+
+  function toggleReplyBox(box, force) {
+    const willOpen = (typeof force === 'boolean') ? force : !box.classList.contains('open');
+    box.classList.toggle('open', willOpen);
+    if (willOpen) {
+      const ta = box.querySelector('textarea');
+      if (ta) setTimeout(() => ta.focus(), 50);
+    }
+  }
+
+  function renderThreadTurn(threadWrap, turn, channel, idx, snapshot) {
+    const t = document.createElement('div');
+    t.className = 'thread-turn';
+    const isAssistant = turn.role === 'assistant';
+    const role = document.createElement('span');
+    role.className = 'thread-role ' + (isAssistant ? 'assistant' : 'you');
+    if (isAssistant) {
+      role.textContent = turn.source ? turn.source : 'gemini';
+    } else {
+      role.textContent = 'you';
+    }
+    t.appendChild(role);
+
+    const text = document.createElement('span');
+    text.className = 'thread-text';
+    text.textContent = turn.text || '';
+    t.appendChild(text);
+
+    if (isAssistant && typeof turn.latency_ms === 'number') {
+      const lat = document.createElement('span');
+      lat.className = 'thread-latency';
+      lat.textContent = '· ' + (turn.latency_ms / 1000).toFixed(1) + 's';
+      t.appendChild(lat);
+    }
+    if (turn.from_earlier) {
+      const note = document.createElement('span');
+      note.className = 'thread-old-note';
+      note.textContent = '// from earlier';
+      t.appendChild(note);
+    }
+
+    // Continue-thread affordance on assistant turns.
+    if (isAssistant) {
+      const cont = document.createElement('button');
+      cont.type = 'button';
+      cont.className = 'reply-toggle thread-reply';
+      cont.textContent = '[ reply ]';
+      cont.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        // Find or create a nested reply-box under this turn.
+        let nested = t.querySelector(':scope > .reply-box');
+        if (!nested) {
+          nested = buildReplyBox(channel, idx, snapshot, turn.turn_id || null);
+          t.appendChild(nested);
+        }
+        toggleReplyBox(nested);
+      });
+      t.appendChild(cont);
+    }
+
+    threadWrap.appendChild(t);
+  }
+
+  async function loadConversationThread() {
+    let thread = null;
+    try {
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), 2000);
+      const res = await fetch('http://localhost:5757/api/journal/conversation/' + dateStr, { signal: ctrl.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) thread = await res.json();
+    } catch (e) {
+      thread = readConvoCache();
+    }
+    if (!thread) return;
+    writeConvoCache(thread);
+
+    // Group turns by anchor (channel + index). Then thread parent_turn_id chains.
+    const turns = Array.isArray(thread.turns) ? thread.turns : [];
+    const byAnchor = new Map();
+    turns.forEach(t => {
+      const a = t.anchor || {};
+      const k = (a.channel || 'reflect') + ':' + (a.index || 0);
+      if (!byAnchor.has(k)) byAnchor.set(k, []);
+      byAnchor.get(k).push(t);
+    });
+
+    byAnchor.forEach((list, key) => {
+      const [channel, idxStr] = key.split(':');
+      const idx = parseInt(idxStr, 10);
+      const host = findAnchorEl(channel, idx);
+      if (!host) return;
+      const box = host.querySelector(':scope > .reply-box');
+      if (!box) return;
+      const threadWrap = box.querySelector(':scope > .thread-wrap');
+      if (!threadWrap) return;
+      threadWrap.innerHTML = '';
+
+      // Snapshot mismatch — annotate.
+      const currentSnap = host.dataset.snapshot || '';
+      const firstSnap = (list[0] && list[0].anchor && list[0].anchor.snapshot) || '';
+      const fromEarlier = currentSnap && firstSnap && currentSnap !== firstSnap;
+
+      // Open box so the user sees the existing turns.
+      toggleReplyBox(box, true);
+
+      list.forEach(t => {
+        renderThreadTurn(threadWrap, {
+          role: t.role,
+          text: t.text || '',
+          ts: t.ts,
+          source: (t.meta && t.meta.source) || (t.role === 'assistant' ? 'gemini' : 'user'),
+          latency_ms: t.meta && t.meta.latency_ms,
+          turn_id: t.turn_id || null,
+          from_earlier: fromEarlier && t.role === 'assistant',
+        }, channel, idx, host.dataset.snapshot || '');
+      });
+    });
+  }
+
+  // Outside-click closes any open reply-box (except the one being interacted with).
+  document.addEventListener('click', (ev) => {
+    const boxes = document.querySelectorAll('.reply-box.open');
+    boxes.forEach(b => {
+      if (!b.contains(ev.target)) {
+        // ignore the toggle button that opened it
+        const parent = b.parentElement;
+        const toggle = parent && parent.querySelector(':scope > .reply-toggle');
+        if (toggle && toggle.contains(ev.target)) return;
+        toggleReplyBox(b, false);
+      }
+    });
+  });
+
+  // `r` key toggles reply on a focused insight item.
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'r' && ev.key !== 'R') return;
+    const meta = ev.metaKey || ev.ctrlKey || ev.altKey;
+    if (meta) return;
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    const focused = document.activeElement;
+    if (!focused) return;
+    if (!focused.classList) return;
+    if (!focused.classList.contains('eng-item') && !focused.classList.contains('reflect-item')) return;
+    ev.preventDefault();
+    const box = focused.querySelector(':scope > .reply-box');
+    if (box) toggleReplyBox(box);
+  });
+
+  /* ===========================================================
+     v1.2 — QGEN OUT-OF-STOCK TRIGGER.
+     After reroll >= 5, expose [ ask gemini ] to fetch fresh
+     questions from the LLM backend.
+     =========================================================== */
+  const SHOWN_IDS_KEY = 'lifeOs.shownIds';
+  function readShownIds() {
+    try {
+      const raw = localStorage.getItem(SHOWN_IDS_KEY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function recordShownIds(ids) {
+    const prev = readShownIds();
+    const merged = [...prev, ...ids];
+    // dedupe while preserving newer-last order, keep last 60
+    const seen = new Set();
+    const out = [];
+    for (let i = merged.length - 1; i >= 0; i--) {
+      if (!seen.has(merged[i])) { seen.add(merged[i]); out.unshift(merged[i]); }
+    }
+    localStorage.setItem(SHOWN_IDS_KEY, JSON.stringify(out.slice(-60)));
+  }
+  recordShownIds(todayQuestions.map(q => q.id));
+
+  const qgenChip   = document.getElementById('qgen-chip');
+  const qgenPill   = document.getElementById('qgen-pill');
+  // chip is permanently hidden — the "running low" UI is replaced by silent
+  // background prefetching into a stash that reroll draws from.
+  if (qgenChip) qgenChip.hidden = true;
+
+  // ---------- silent gemini stash prefetch ----------
+  // Fires once after initial render if the local stash is thin AND we
+  // haven't fetched in the last 6 hours. Adds questions to the stash,
+  // which pickQuestions() blends into future reroll selections.
+  async function prefetchQgenStash() {
+    const stash = readQgenStash();
+    if (stash.length >= 8) return;  // plenty in pool
+    const lastFetch = parseInt(localStorage.getItem(QGEN_LASTFETCH_KEY) || '0', 10);
+    if (Date.now() - lastFetch < 6 * 60 * 60 * 1000) return;  // cooldown
+    try {
+      const t0 = performance.now();
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 30000);
+      const res = await fetch('http://localhost:5757/api/journal/questions/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: dateStr,
+          reroll_count: rerollN,
+          accent: { name: accent.name, hex: accent.hex },
+          recent_question_ids: readShownIds(),
+          want: { light: 3, medium: 3, heavy: 2 },
+          vibe: null,
+          history_oneliners: [],
+        }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(tid);
+      if (!res.ok) return;
+      const json = await res.json();
+      const fresh = (Array.isArray(json.questions) ? json.questions : []).filter(q => q && q.id && q.weight);
+      if (!fresh.length) return;
+      localStorage.setItem(QGEN_LASTFETCH_KEY, String(Date.now()));
+      const next = [...readQgenStash(), ...fresh];
+      writeQgenStash(next);
+
+      // Brief silent confirmation — fades after a few seconds.
+      const src = (json.meta && json.meta.source) || 'gemini';
+      const lat = ((json.meta && json.meta.latency_ms) || (performance.now() - t0)) / 1000;
+      if (qgenPill) {
+        qgenPill.hidden = false;
+        qgenPill.classList.remove('fade');
+        qgenPill.textContent = `// stash topped up · ${fresh.length} fresh from ${src} · ${lat.toFixed(1)}s`;
+        setTimeout(() => {
+          if (qgenPill) {
+            qgenPill.classList.add('fade');
+            setTimeout(() => { if (qgenPill) qgenPill.hidden = true; }, 700);
+          }
+        }, 4500);
+      }
+    } catch (e) { /* silent */ }
+  }
+  // Defer to next idle to avoid blocking initial render / first paint.
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(prefetchQgenStash, { timeout: 3000 });
+  } else {
+    setTimeout(prefetchQgenStash, 1500);
+  }
+
+  /* ===========================================================
+     v1.2 — OPT-IN ENRICH (freshen labels).
+     User-triggered: posts the rendered question seeds and swaps
+     labels/placeholders/option text in-place.
+     =========================================================== */
+  const freshenBtn   = document.getElementById('freshen-link');
+  const freshenBadge = document.getElementById('freshen-badge');
+
+  async function freshenLabels() {
+    freshenBtn.disabled = true;
+    const t0 = performance.now();
+    try {
+      const seeds = todayQuestions.map(q => {
+        const s = { id: q.id, type: q.type, label: q.label, weight: q.weight };
+        if (typeof q.min === 'number') s.min = q.min;
+        if (typeof q.max === 'number') s.max = q.max;
+        if (Array.isArray(q.options)) s.options = q.options;
+        if (q.placeholder) s.placeholder = q.placeholder;
+        if (q.leftLabel)   s.leftLabel   = q.leftLabel;
+        if (q.rightLabel)  s.rightLabel  = q.rightLabel;
+        return s;
+      });
+      const res = await fetch('http://localhost:5757/api/journal/questions/enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: dateStr,
+          seeds: seeds,
+          accent: { name: accent.name, hex: accent.hex },
+          vibe: null,
+          history_oneliners: [],
+        }),
+      });
+      const elapsed = performance.now() - t0;
+      if (!res.ok) throw new Error('bad status');
+      const json = await res.json();
+      const enriched = Array.isArray(json.questions) ? json.questions : [];
+
+      enriched.forEach(eq => {
+        const q = todayQuestions.find(x => x.id === eq.id);
+        if (!q) return;
+        if (eq.label) q.label = eq.label;
+        if (eq.placeholder) q.placeholder = eq.placeholder;
+        if (eq.leftLabel)   q.leftLabel   = eq.leftLabel;
+        if (eq.rightLabel)  q.rightLabel  = eq.rightLabel;
+        if (Array.isArray(eq.options)) q.options = eq.options;
+
+        // Swap visible DOM bits without disturbing entered values.
+        const wrap = form.querySelector(`.q[data-qid="${eq.id}"]`);
+        if (!wrap) return;
+        const labelEl = wrap.querySelector(':scope > .q-label');
+        if (labelEl && eq.label) labelEl.textContent = eq.label;
+        if (eq.placeholder) {
+          const ta = wrap.querySelector('textarea, input.text-input');
+          if (ta) ta.placeholder = eq.placeholder;
+        }
+        const ends = wrap.querySelector(':scope .slider-ends');
+        if (ends) {
+          const spans = ends.querySelectorAll('span');
+          if (spans[0] && eq.leftLabel)  spans[0].textContent = eq.leftLabel;
+          if (spans[1] && eq.rightLabel) spans[1].textContent = eq.rightLabel;
+        }
+      });
+
+      const src = (json.meta && json.meta.source) || 'gemini';
+      const lat = ((json.meta && json.meta.latency_ms) || elapsed) / 1000;
+      freshenBadge.hidden = false;
+      freshenBadge.classList.remove('fade');
+      freshenBadge.textContent = `// freshened by ${src} · ${lat.toFixed(1)}s`;
+      setTimeout(() => freshenBadge.classList.add('fade'), 3000);
+      freshenBtn.disabled = false;
+    } catch (e) {
+      // silent — no toast on failure (spec)
+      freshenBtn.disabled = false;
+    }
+  }
+  freshenBtn.addEventListener('click', freshenLabels);
+
+  // On load, try to rehydrate any conversation from cache so a user who
+  // reloads (without saving) still sees their existing thread.
+  (function rehydrateThreadsOnLoad() {
+    const cached = readConvoCache();
+    if (cached) {
+      // Defer to next tick so feedback DOM may exist (e.g. if user already saved earlier today).
+      // If feedback isn't open, this is a no-op (findAnchorEl returns null).
+      setTimeout(() => { try { loadConversationThread(); } catch (e) {} }, 100);
+    }
+  })();
+
+})();
+</script>
+</body>
+</html>

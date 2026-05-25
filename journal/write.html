@@ -1,0 +1,3413 @@
+<!doctype html>
+<html class="dark" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>write.</title>
+  <link rel="stylesheet" href="_tokens.css">
+  <script src="_api.js"></script>
+  <script src="_accent.js"></script>
+  <style>
+    /* page-local — every color/size below pulls from _tokens.css */
+
+    /* Accent blob — same family as today.html, but offset right (sidebar is left). */
+    .blob {
+      position: fixed;
+      top: 30%; left: 60%;
+      width: 700px; height: 700px;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle at center,
+        color-mix(in srgb, var(--accent) 22%, transparent) 0%,
+        transparent 60%);
+      filter: blur(100px);
+      z-index: -1;
+      pointer-events: none;
+      animation: drift 75s linear infinite;
+      transition: background var(--t-base) var(--ease);
+    }
+    body.focus-mode .blob {
+      background: radial-gradient(circle at center,
+        color-mix(in srgb, var(--accent) 26%, transparent) 0%,
+        transparent 60%);
+    }
+    @keyframes drift {
+      0%   { transform: translate(-52%, -50%); }
+      50%  { transform: translate(-48%, -54%); }
+      100% { transform: translate(-52%, -50%); }
+    }
+
+    /* Top bar (status + nav) sits inside the canvas column. */
+    .top-bar {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 28px 22px 8px;
+    }
+
+    /* Whole-page shell: sidebar | canvas | rail */
+    .shell {
+      display: grid;
+      grid-template-columns: 200px minmax(0, 1fr);
+      gap: 0;
+      min-height: 100vh;
+    }
+    @media (min-width: 1100px) {
+      .shell.with-rail { grid-template-columns: 200px minmax(0, 1fr) 280px; }
+    }
+    .shell.sidebar-collapsed { grid-template-columns: 48px minmax(0, 1fr); }
+    @media (min-width: 1100px) {
+      .shell.sidebar-collapsed.with-rail { grid-template-columns: 48px minmax(0, 1fr) 280px; }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Sidebar                                                             */
+    /* ------------------------------------------------------------------ */
+    .sidebar {
+      position: sticky;
+      top: 0;
+      align-self: start;
+      height: 100vh;
+      padding: 28px 18px 18px;
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: var(--tight);
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .sidebar.collapsed {
+      padding: 28px 8px 18px;
+      align-items: center;
+    }
+    .sidebar.collapsed .sb-section,
+    .sidebar.collapsed .sb-label,
+    .sidebar.collapsed .sb-meta,
+    .sidebar.collapsed .sb-list,
+    .sidebar.collapsed .sb-goal,
+    .sidebar.collapsed .sb-end {
+      display: none;
+    }
+
+    .sb-label {
+      text-transform: uppercase;
+      letter-spacing: var(--wide);
+      color: var(--muted);
+      font-size: 10px;
+      margin-bottom: 8px;
+    }
+    .sb-meta-num {
+      font-family: var(--font-num);
+      font-feature-settings: "tnum";
+      font-size: 44px;
+      line-height: 1;
+      color: var(--fg);
+      font-weight: 500;
+      transition: font-weight 600ms var(--ease);
+    }
+    .sb-meta-num.tick { font-weight: 700; }
+    .sb-meta-sub {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .sb-meta-time.session-ended { color: var(--muted-2); }
+    .sb-meta-time {
+      font-family: var(--font-num);
+      font-feature-settings: "tnum";
+      font-size: 24px;
+      color: var(--fg);
+      margin-top: 12px;
+      line-height: 1;
+    }
+    .sb-meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-top: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .sb-meta-row .v { color: var(--fg); font-feature-settings: "tnum"; }
+
+    .sb-goal { margin-top: 10px; }
+    .sb-goal-text {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .sb-goal-bar {
+      position: relative;
+      height: 3px;
+      background: var(--border-2);
+      border-radius: var(--r-1);
+    }
+    .sb-goal-fill {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      background: var(--accent);
+      border-radius: var(--r-1);
+      transition: width var(--t-base) var(--ease);
+    }
+
+    .sb-list { display: flex; flex-direction: column; gap: 4px; }
+    .sb-list a, .sb-list button {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      text-decoration: none;
+      background: transparent;
+      border: 0;
+      padding: 4px 0;
+      cursor: pointer;
+      transition: color var(--t-fast) var(--ease);
+      text-align: left;
+      letter-spacing: var(--tight);
+    }
+    .sb-list a:hover, .sb-list button:hover { color: var(--accent); }
+    .sb-list .sb-row-meta { color: var(--muted-2); font-size: 10px; }
+    .sb-list a.current, .sb-list button.current { color: var(--fg); }
+
+    .sb-section { padding-top: 16px; border-top: 1px solid var(--border); }
+    .sb-section:first-child { padding-top: 0; border-top: 0; }
+
+    .sb-end {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .sb-link {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      padding: 4px 0;
+      text-align: left;
+      transition: color var(--t-fast) var(--ease);
+    }
+    .sb-link:hover { color: var(--accent); }
+    .sb-collapse {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted-2);
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      padding: 4px 0;
+      text-align: left;
+    }
+    .sb-collapse:hover { color: var(--accent); }
+    .sb-collapsed-icon {
+      display: none;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--muted);
+      cursor: pointer;
+      writing-mode: vertical-rl;
+      letter-spacing: var(--wide);
+      transform: rotate(180deg);
+      padding: 8px 4px;
+    }
+    .sidebar.collapsed .sb-collapsed-icon { display: block; }
+    .sb-collapsed-icon:hover { color: var(--accent); }
+
+    .sb-saved {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted-2);
+      letter-spacing: var(--tight);
+      margin-top: 6px;
+      min-height: 12px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Canvas                                                              */
+    /* ------------------------------------------------------------------ */
+    .canvas {
+      min-width: 0;
+      padding: 0 0 96px;
+    }
+    .canvas-inner {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 0 22px;
+    }
+
+    .nav {
+      margin-bottom: 24px;
+    }
+
+    .page-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin: 0 0 28px;
+    }
+    h1.page-title { margin: 0; }
+    .page-sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* Mode toggle — explicit write/read split */
+    .mode-toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin: 0 0 24px;
+      flex-wrap: wrap;
+    }
+    .mode-toggle {
+      display: inline-flex;
+      border: 1px solid var(--border);
+    }
+    .mode-toggle button {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      padding: 7px 14px;
+      cursor: pointer;
+      transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+    }
+    .mode-toggle button + button { border-left: 1px solid var(--border); }
+    .mode-toggle button:hover { color: var(--fg); }
+    .mode-toggle button.active {
+      color: var(--bg);
+      background: var(--accent);
+    }
+    .mode-hint {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted-2);
+    }
+    .mode-hint .v { color: var(--accent); }
+
+    /* read mode dims compose affordances + freezes textareas */
+    body.mode-read .new-session-row { opacity: 0.3; pointer-events: none; }
+    body.mode-read .prompt-strip { opacity: 0.35; pointer-events: none; }
+    body.mode-read .block-actions { opacity: 0.35; pointer-events: none; }
+    body.mode-read .block textarea {
+      background: transparent;
+      color: var(--muted);
+      cursor: default;
+      caret-color: transparent;
+    }
+    body.mode-read .block-head .dot { animation: none; opacity: 0.25; }
+    body.mode-read #sb-time { color: var(--muted-2); }
+    body.mode-read .sb-saved { color: var(--muted-2); }
+    body.mode-read #read-detail { display: block; }
+
+    /* read-mode detailed feedback panel */
+    #read-detail { display: none; margin: 0 0 32px; }
+    .read-detail-status {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted-2);
+      padding: 12px 0;
+    }
+    .rd-section {
+      padding-top: 22px;
+      margin-bottom: 26px;
+      border-top: 1px solid var(--border);
+    }
+    .rd-section:first-of-type { padding-top: 0; border-top: 0; }
+    .rd-section-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .rd-section-label .count { color: var(--muted-2); font-feature-settings: "tnum"; margin-left: 6px; }
+    .rd-item {
+      padding: 12px 0;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .rd-item:first-child { border-top: 0; }
+    .rd-eng-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px;
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .rd-eng-row .orig { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--muted-2); }
+    .rd-eng-row .arrow { color: var(--accent); }
+    .rd-eng-row .upg { color: var(--fg); font-weight: 500; }
+    .rd-note {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted-2);
+      line-height: 1.5;
+    }
+    .rd-obs {
+      font-family: var(--font-sans);
+      font-size: 14.5px;
+      color: var(--fg);
+      line-height: 1.6;
+    }
+    .rd-obs .kind {
+      display: inline-block;
+      margin-left: 8px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 1px 6px;
+      border-radius: var(--r-1);
+      vertical-align: 2px;
+    }
+    .rd-evidence {
+      display: grid;
+      grid-template-columns: 90px 1fr;
+      gap: 12px;
+      padding: 4px 0 4px 14px;
+      border-left: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .rd-evidence .date { color: var(--accent); letter-spacing: var(--wide); }
+    .rd-evidence .quote { color: var(--muted); font-style: italic; }
+    .rd-pattern {
+      font-family: var(--font-sans);
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+      padding-left: 14px;
+      position: relative;
+      margin-bottom: 6px;
+    }
+    .rd-pattern::before { content: '·'; position: absolute; left: 0; color: var(--accent); }
+    .rd-tomorrow {
+      font-family: var(--font-serif, var(--font-sans));
+      font-size: 16px;
+      color: var(--fg);
+      line-height: 1.55;
+      font-style: italic;
+      padding: 12px 16px;
+      border-left: 2px solid var(--accent);
+      background: var(--bg-2);
+    }
+
+    /* New session button. */
+    .new-session-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin: 0 0 28px;
+      flex-wrap: wrap;
+    }
+
+    /* Block — a single session textarea. */
+    .block {
+      margin: 0 0 64px;
+      position: relative;
+    }
+    .block-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 6px 0 10px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .block-head .sep { color: var(--muted-2); }
+    .block-head .dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 1.5s var(--ease) infinite;
+    }
+    .block-head .word-pill {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-feature-settings: "tnum";
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: var(--tight);
+    }
+    .block-head .word-pill.flash { color: var(--accent); }
+    .block-head .committed-pill {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 1px 6px;
+      border-radius: var(--r-1);
+    }
+    .block.pulse-accent .block-head {
+      border-bottom-color: var(--accent);
+      transition: border-bottom-color 1s var(--ease);
+    }
+
+    .prompt-strip {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .chip-btn {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-1);
+      padding: 4px 8px;
+      cursor: pointer;
+      transition: all var(--t-fast) var(--ease);
+    }
+    .chip-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+    .block-prompt {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--accent);
+      border-left: 1px solid var(--accent);
+      padding: 4px 0 4px 12px;
+      margin: 0 0 14px;
+    }
+
+    .write-area {
+      width: 100%;
+      background: transparent;
+      border: 0;
+      outline: none;
+      color: var(--fg);
+      font-family: var(--font-sans);
+      font-size: 20px;
+      line-height: 1.85;
+      font-weight: 450;
+      letter-spacing: -0.01em;
+      padding: 18px 0 36px;
+      min-height: 240px;
+      resize: none;
+      caret-color: var(--accent);
+      max-width: 660px;
+    }
+    .write-area::placeholder { color: var(--muted-2); font-weight: 400; letter-spacing: 0; }
+    .write-area:focus { outline: none; }
+
+    /* Markdown-ish inline blocks rendered inside contenteditable. */
+    .block-rule {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 18px 0;
+    }
+    .inline-h {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 12px 0 6px;
+    }
+
+    .block-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+    .publish-btn {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-1);
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: all var(--t-fast) var(--ease);
+    }
+    .publish-btn:hover { color: var(--accent); border-color: var(--accent); }
+    .publish-btn.committed {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Feedback rail (right)                                               */
+    /* ------------------------------------------------------------------ */
+    .rail {
+      display: none;
+      position: sticky;
+      top: 0;
+      align-self: start;
+      height: 100vh;
+      padding: 28px 22px 18px;
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    @media (min-width: 1100px) {
+      .rail { display: flex; flex-direction: column; gap: 20px; }
+    }
+    .rail.silenced { display: none !important; }
+
+    .rail-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .rail-head .live-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 1.5s var(--ease) infinite;
+    }
+
+    .rail-tabs {
+      display: flex;
+      gap: 6px;
+    }
+    .rail-tab {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-1);
+      padding: 4px 8px;
+      cursor: pointer;
+      transition: all var(--t-fast) var(--ease);
+    }
+    .rail-tab:hover { color: var(--accent); }
+    .rail-tab.active { color: var(--accent); border-color: var(--accent); }
+
+    .rail-body {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 0;
+    }
+    .rail-empty {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--tight);
+      color: var(--muted-2);
+      padding: 12px 0;
+    }
+    .rail-item {
+      padding: 10px 0;
+      border-top: 1px solid var(--border);
+      animation: fadeIn var(--t-base) var(--ease);
+    }
+    .rail-item:first-child { border-top: 0; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .rail-orig {
+      font-family: var(--font-sans);
+      font-size: 12px;
+      color: var(--muted);
+      text-decoration: line-through;
+      text-decoration-color: var(--muted-2);
+    }
+    .rail-arrow {
+      font-family: var(--font-mono);
+      color: var(--muted-2);
+      margin: 0 6px;
+    }
+    .rail-upg {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      color: var(--fg);
+      border-bottom: 1px solid var(--accent);
+    }
+    .rail-note {
+      display: block;
+      font-family: var(--font-sans);
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .rail-obs {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      color: var(--fg);
+      line-height: var(--lh-body);
+    }
+    .rail-obs::before {
+      content: "· ";
+      color: var(--muted-2);
+      font-family: var(--font-mono);
+    }
+    .rail-kind {
+      display: inline-block;
+      margin-left: 6px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-1);
+      padding: 1px 5px;
+      vertical-align: 1px;
+    }
+    .rail-evidence {
+      display: block;
+      margin-top: 6px;
+      margin-left: 14px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      border-left: 1px solid var(--border);
+      padding: 2px 0 2px 8px;
+    }
+    .rail-evidence .ev-date {
+      color: var(--accent);
+      margin-right: 6px;
+    }
+    .rail-section-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 10px 0 6px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .rail-section-label:first-child {
+      border-top: 0;
+      padding-top: 0;
+      margin-top: 0;
+    }
+    .rail-section-label .count {
+      color: var(--muted-2);
+      margin-left: 4px;
+    }
+    .rail-pattern {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      color: var(--fg);
+      line-height: var(--lh-body);
+      padding: 6px 0;
+      border-top: 1px solid var(--border);
+    }
+    .rail-pattern:first-of-type { border-top: 0; }
+    .rail-pattern::before {
+      content: "· ";
+      color: var(--muted-2);
+      font-family: var(--font-mono);
+    }
+    .rail-tomorrow {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--accent);
+      line-height: 1.5;
+      padding: 6px 0;
+    }
+
+    /* Reflect-kinds mini-bar chart in track overlay. */
+    .reflect-kinds {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .rk-row {
+      display: grid;
+      grid-template-columns: 110px 1fr 28px;
+      gap: 10px;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .rk-bar-wrap {
+      position: relative;
+      height: 4px;
+      background: var(--border);
+      border-radius: var(--r-1);
+    }
+    .rk-bar {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      background: var(--accent);
+      border-radius: var(--r-1);
+    }
+    .rk-count {
+      font-feature-settings: "tnum";
+      color: var(--fg);
+      text-align: right;
+    }
+    .rk-empty {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted-2);
+    }
+    .rail-foot {
+      margin-top: auto;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+    }
+    .rail-foot button {
+      background: transparent;
+      border: 0;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      cursor: pointer;
+      padding: 4px 0;
+      transition: color var(--t-fast) var(--ease);
+    }
+    .rail-foot button:hover { color: var(--accent); }
+
+    /* Unsilence affordance — small floating chip if rail is silenced. */
+    .unsilence {
+      display: none;
+      position: fixed;
+      right: 18px;
+      top: 60px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--bg);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-1);
+      padding: 4px 8px;
+      cursor: pointer;
+      z-index: 10;
+    }
+    .unsilence:hover { color: var(--accent); border-color: var(--accent); }
+    .unsilence.shown { display: block; }
+
+    /* ------------------------------------------------------------------ */
+    /* Track overlay                                                       */
+    /* ------------------------------------------------------------------ */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--scrim);
+      display: none;
+      z-index: 50;
+      overflow-y: auto;
+    }
+    .overlay.open { display: block; }
+
+    .overlay-panel {
+      background: var(--bg);
+      border: 1px solid var(--border-2);
+      max-width: 920px;
+      margin: 40px auto;
+      padding: 32px 36px 40px;
+      border-radius: var(--r-1);
+      position: relative;
+    }
+    .overlay-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 28px;
+    }
+    .overlay-title {
+      font-family: var(--font-sans);
+      font-weight: 600;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+    .overlay-title .dot { color: var(--accent); }
+    .overlay-close {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      padding: 4px;
+      transition: color var(--t-fast) var(--ease);
+    }
+    .overlay-close:hover { color: var(--accent); }
+
+    .track-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      margin-bottom: 32px;
+    }
+    @media (max-width: 700px) {
+      .track-grid { grid-template-columns: 1fr; }
+    }
+    .track-card .track-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .track-streak-num {
+      font-family: var(--font-num);
+      font-feature-settings: "tnum";
+      font-size: 56px;
+      line-height: 1;
+      color: var(--fg);
+    }
+    .track-streak-sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .track-section {
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      margin-bottom: 28px;
+    }
+    .track-section-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .theme-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 14px;
+      align-items: baseline;
+    }
+    .theme-cloud .t {
+      font-family: var(--font-mono);
+      color: var(--fg);
+      cursor: default;
+      letter-spacing: var(--tight);
+    }
+    .recent-lines { display: flex; flex-direction: column; gap: 10px; }
+    .recent-line {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 14px;
+      padding: 6px 0;
+      border-top: 1px solid var(--border);
+    }
+    .recent-line:first-child { border-top: 0; }
+    .recent-line .date {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .recent-line .text {
+      font-family: var(--font-sans);
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* Track label hint — clarifies what the chart actually measures */
+    .track-label-hint {
+      font-size: 10px;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--muted-2);
+      margin-left: 6px;
+    }
+
+    /* AI summary block inside track overlay */
+    .track-section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .track-section-head .track-section-label { margin-bottom: 0; }
+    .track-summary-refresh {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+    }
+    .track-summary-refresh:hover { color: var(--accent); border-color: var(--accent); }
+    .track-summary-refresh:disabled { opacity: 0.5; cursor: progress; }
+    .track-summary-body { display: flex; flex-direction: column; gap: 18px; }
+    .track-summary-text {
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.65;
+      color: var(--fg);
+      margin: 0;
+    }
+    .track-summary-text.muted { color: var(--muted-2); font-family: var(--font-mono); font-size: 12px; }
+    .track-momentum {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding: 10px 14px;
+      border-left: 2px solid var(--accent);
+      background: var(--bg-2);
+    }
+    .track-momentum-trend {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .track-momentum-note {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .track-sub-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted-2);
+      margin-bottom: 8px;
+    }
+    .track-shifts-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .track-shifts-list li {
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      color: var(--muted);
+      line-height: 1.55;
+      padding-left: 14px;
+      position: relative;
+    }
+    .track-shifts-list li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+    .track-memorable-list { display: flex; flex-direction: column; gap: 10px; }
+    .track-memorable-line {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 14px;
+      padding: 6px 0;
+      border-top: 1px solid var(--border);
+    }
+    .track-memorable-line:first-child { border-top: 0; }
+    .track-memorable-line .date {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .track-memorable-line .quote {
+      font-family: var(--font-serif, var(--font-sans));
+      color: var(--fg);
+      font-size: 14px;
+      line-height: 1.55;
+      font-style: italic;
+    }
+
+    /* SVG bar chart. */
+    .bar-svg { width: 100%; height: 100px; display: block; }
+
+    /* ------------------------------------------------------------------ */
+    /* Cheatsheet drawer                                                   */
+    /* ------------------------------------------------------------------ */
+    .cheat {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: var(--bg-2);
+      border-top: 1px solid var(--border-2);
+      transform: translateY(100%);
+      transition: transform var(--t-base) var(--ease);
+      padding: 22px 24px 28px;
+      z-index: 40;
+    }
+    .cheat.open { transform: translateY(0); }
+    .cheat h3 {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 14px;
+      font-weight: 400;
+    }
+    .cheat ul { list-style: none; padding: 0; margin: 0; columns: 2; gap: 32px; }
+    .cheat li {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--fg);
+      padding: 4px 0;
+    }
+    .kbd {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r-1);
+      padding: 1px 5px;
+      margin-right: 4px;
+    }
+    .cheat .close-cheat {
+      position: absolute;
+      right: 16px;
+      top: 12px;
+      background: transparent;
+      border: 0;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .cheat .close-cheat:hover { color: var(--accent); }
+
+    /* Bottom-right floating affordance. */
+    .float-bar {
+      position: fixed;
+      right: 18px;
+      bottom: 16px;
+      display: flex;
+      gap: 8px;
+      z-index: 30;
+    }
+    .float-bar button {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--bg);
+      border: 1px solid var(--border-2);
+      border-radius: var(--r-1);
+      padding: 4px 8px;
+      cursor: pointer;
+      transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+    }
+    .float-bar button:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* Mobile: hide sidebar (collapse), full-width canvas. */
+    @media (max-width: 720px) {
+      .shell { grid-template-columns: 1fr; }
+      .shell.sidebar-collapsed { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Focus mode — chrome recedes when you type.                          */
+    /* ------------------------------------------------------------------ */
+    .sidebar, .rail, .status, .nav, .path-crumb, .block {
+      transition: opacity 400ms var(--ease);
+    }
+    body.focus-mode .sidebar { opacity: 0.18; }
+    body.focus-mode .rail    { opacity: 0.18; }
+    body.focus-mode .status  { opacity: 0.35; }
+    body.focus-mode .nav     { opacity: 0.35; }
+    body.focus-mode .path-crumb { opacity: 0.18; }
+    body.focus-mode .block.inactive { opacity: 0.5; }
+    body.focus-mode .block.active   { opacity: 1; }
+    /* hover restores faded chrome */
+    body.focus-mode .sidebar:hover,
+    body.focus-mode .rail:hover,
+    body.focus-mode .status:hover,
+    body.focus-mode .nav:hover,
+    body.focus-mode .path-crumb:hover { opacity: 1; }
+
+    /* Hold-to-publish commit visual */
+    .publish-btn { position: relative; overflow: hidden; }
+    .publish-btn .commit-fill {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 0;
+      background: color-mix(in srgb, var(--accent) 28%, transparent);
+      pointer-events: none;
+      transition: width 80ms linear;
+    }
+    .publish-btn.holding { color: var(--accent); border-color: var(--accent); }
+
+    /* ------------------------------------------------------------------ */
+    /* Conversation reply UI in the right rail (v1.2)                      */
+    /* ------------------------------------------------------------------ */
+    .rail-item { position: relative; }
+    .rail-item .reply-toggle {
+      display: block;
+      text-align: right;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--tight);
+      color: var(--muted);
+      cursor: pointer;
+      margin-top: 8px;
+      user-select: none;
+      transition: color var(--t-fast) var(--ease);
+    }
+    .rail-item .reply-toggle:hover { color: var(--accent); }
+    .reply-box {
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transition: max-height 200ms var(--ease), opacity 200ms var(--ease);
+    }
+    .reply-box.open {
+      max-height: 320px;
+      opacity: 1;
+      padding-top: 10px;
+    }
+    .reply-box textarea {
+      width: 100%;
+      box-sizing: border-box;
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid var(--border-2);
+      color: var(--fg);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.55;
+      padding: 6px 0;
+      min-height: 60px;
+      resize: vertical;
+      caret-color: var(--accent);
+    }
+    .reply-box textarea:focus {
+      outline: none;
+      border-bottom-color: var(--accent);
+    }
+    .reply-box .send-row {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .reply-box .send-row .send-status {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+    }
+    .reply-box .send-row .btn {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 10px;
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      cursor: pointer;
+      border-radius: var(--r-1);
+      transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+    }
+    .reply-box .send-row .btn:hover { background: var(--accent); color: var(--bg); }
+    .reply-box .send-row .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .thread {
+      margin-top: 10px;
+      padding-left: 10px;
+      border-left: 1px solid var(--border);
+    }
+    .thread-turn {
+      padding: 8px 0;
+      border-top: 1px solid var(--border);
+    }
+    .thread-turn:first-of-type { border-top: 0; }
+    .thread-role {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--wide);
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-right: 8px;
+    }
+    .thread-role.assistant { color: var(--accent); }
+    .thread-text {
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--fg);
+      white-space: pre-wrap;
+    }
+    .thread-latency {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted-2);
+      margin-left: 6px;
+    }
+    .thread-error {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .thread-turn .reply-toggle {
+      display: inline-block;
+      margin-left: 10px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: var(--tight);
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+      transition: color var(--t-fast) var(--ease);
+    }
+    .thread-turn .reply-toggle:hover { color: var(--accent); }
+
+    /* Reduced motion: kill the drift blob, pulses, fadeIns, focus-mode anim. */
+    @media (prefers-reduced-motion: reduce) {
+      .blob { animation: none !important; }
+      .block-head .dot,
+      .rail-head .live-dot { animation: none !important; }
+      .rail-item { animation: none !important; }
+      .block.pulse-accent .block-head { transition: none !important; }
+      .sb-goal-fill { transition: none !important; }
+      .sidebar, .rail, .status, .nav, .path-crumb, .block { transition: none !important; }
+      .sb-meta-num { transition: none !important; }
+      .publish-btn .commit-fill { transition: none !important; }
+      .reply-box, .reply-box.open { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="blob" aria-hidden="true"></div>
+
+  <div class="shell with-rail" id="shell">
+
+    <!-- ----------------- SIDEBAR ----------------- -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sb-collapsed-icon" id="sb-expand-icon" title="expand sidebar (⌘B)">▸ session</div>
+
+      <section class="sb-section sb-meta">
+        <div class="sb-label">session</div>
+        <div class="sb-meta-num" id="sb-words">0</div>
+        <div class="sb-meta-sub">words</div>
+        <div class="sb-meta-time" id="sb-time">00:00:00</div>
+        <div class="sb-meta-row">
+          <span>w/min</span>
+          <span class="v" id="sb-wpm">0</span>
+        </div>
+        <div class="sb-goal" id="sb-goal-wrap" style="display:none">
+          <div class="sb-goal-text">goal: <span id="sb-goal-num">800</span></div>
+          <div class="sb-goal-bar"><div class="sb-goal-fill" id="sb-goal-fill" style="width:0%"></div></div>
+        </div>
+        <div class="sb-saved" id="sb-saved">·</div>
+      </section>
+
+      <section class="sb-section">
+        <div class="sb-label">today's blocks</div>
+        <div class="sb-list" id="sb-blocks"></div>
+      </section>
+
+      <section class="sb-section">
+        <div class="sb-label">recent</div>
+        <div class="sb-list" id="sb-recent"></div>
+      </section>
+
+      <div class="sb-end">
+        <button class="sb-link" id="open-track" type="button">[ track ]</button>
+        <button class="sb-link" id="set-goal" type="button">[ set goal ]</button>
+        <button class="sb-link" id="end-session" type="button">[ end session ]</button>
+        <button class="sb-collapse" id="collapse-sb" type="button">▾ ⌘b · collapse</button>
+      </div>
+    </aside>
+
+    <!-- ----------------- CANVAS ----------------- -->
+    <main class="canvas">
+      <div class="canvas-inner">
+        <div class="status" id="status"></div>
+
+        <nav class="nav">
+          <a href="today.html" data-page="today">today</a>
+          <a href="write.html" class="current" data-page="write">write</a>
+          <a href="archive.html" data-page="archive">archive</a>
+          <a href="english.html" data-page="english">english</a>
+        </nav>
+
+
+        <div class="page-head">
+          <h1 class="page-title">write<span class="dot">.</span></h1>
+          <div class="page-sub" id="page-sub">// no rules. just write.</div>
+        </div>
+
+        <div class="mode-toggle-row">
+          <div class="mode-toggle" id="mode-toggle" role="tablist" aria-label="page mode">
+            <button type="button" class="active" data-mode="write" role="tab" aria-selected="true">[ write ]</button>
+            <button type="button" data-mode="read" role="tab" aria-selected="false">[ read ]</button>
+          </div>
+          <div class="mode-hint" id="mode-hint">composing · <span class="v">timer running</span></div>
+        </div>
+
+        <section id="read-detail" aria-live="polite">
+          <div class="read-detail-status" id="read-detail-status">// loading today's feedback…</div>
+          <div id="read-detail-body"></div>
+        </section>
+
+        <div class="new-session-row">
+          <button type="button" class="btn" id="new-block">[ + new block ]</button>
+          <button type="button" class="chip-btn" id="prompt-me">prompt me · ⌘p</button>
+        </div>
+
+        <div id="blocks-host"></div>
+
+        <div class="path-crumb">~/life-os/journal/write.html</div>
+      </div>
+    </main>
+
+    <!-- ----------------- FEEDBACK RAIL ----------------- -->
+    <aside class="rail" id="rail">
+      <div class="rail-head">
+        <span class="live-dot"></span>
+        <span id="rail-source-pill">feedback · live · rules</span>
+      </div>
+      <div class="rail-tabs">
+        <button class="rail-tab active" data-tab="english" type="button">english</button>
+        <button class="rail-tab" data-tab="reflect" type="button">reflect</button>
+      </div>
+      <div class="rail-body" id="rail-body">
+        <div class="rail-empty">// the rail watches. it speaks rarely.</div>
+      </div>
+      <div class="rail-foot">
+        <button id="silence-rail" type="button">[ silence rail ]</button>
+      </div>
+    </aside>
+
+  </div>
+
+  <button class="unsilence" id="unsilence" type="button">[ rail ]</button>
+
+  <!-- ----------------- TRACK OVERLAY ----------------- -->
+  <div class="overlay" id="track-overlay" aria-hidden="true">
+    <div class="overlay-panel">
+      <div class="overlay-head">
+        <h2 class="overlay-title">track<span class="dot">.</span></h2>
+        <button class="overlay-close" id="track-close" type="button">[esc] close</button>
+      </div>
+
+      <div class="track-grid">
+        <div class="track-card">
+          <div class="track-label">words written / day · last 30</div>
+          <svg class="bar-svg" id="track-words-chart" viewBox="0 0 300 100" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="track-card">
+          <div class="track-label">writing minutes / day · last 30 <span class="track-label-hint">(time you spent typing — not feedback wait)</span></div>
+          <svg class="bar-svg" id="track-time-chart" viewBox="0 0 300 100" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+
+      <div class="track-grid">
+        <div class="track-card">
+          <div class="track-label">streak</div>
+          <div class="track-streak-num" id="track-streak">0</div>
+          <div class="track-streak-sub">days writing</div>
+        </div>
+        <div class="track-card">
+          <div class="track-label">totals</div>
+          <div class="track-streak-num" id="track-total-words">0</div>
+          <div class="track-streak-sub">words this month</div>
+        </div>
+      </div>
+
+      <section class="track-section" id="track-summary-section">
+        <div class="track-section-head">
+          <div class="track-section-label">ai summary · last <span id="track-summary-window">30</span> days</div>
+          <button class="track-summary-refresh" id="track-summary-refresh" type="button">[ refresh ]</button>
+        </div>
+        <div class="track-summary-body">
+          <p class="track-summary-text" id="track-summary-text">// not loaded</p>
+          <div class="track-momentum" id="track-momentum" style="display:none">
+            <span class="track-momentum-trend" id="track-momentum-trend"></span>
+            <span class="track-momentum-note" id="track-momentum-note"></span>
+          </div>
+          <div class="track-shifts" id="track-shifts-wrap" style="display:none">
+            <div class="track-sub-label">shifts</div>
+            <ul class="track-shifts-list" id="track-shifts-list"></ul>
+          </div>
+          <div class="track-memorable" id="track-memorable-wrap" style="display:none">
+            <div class="track-sub-label">memorable lines</div>
+            <div class="track-memorable-list" id="track-memorable-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="track-section">
+        <div class="track-section-label">themes · top 15</div>
+        <div class="theme-cloud" id="theme-cloud"></div>
+      </section>
+
+      <section class="track-section" id="reflect-kinds-section" style="display:none">
+        <div class="track-section-label">reflect kinds · last 30 entries</div>
+        <div class="reflect-kinds" id="reflect-kinds"></div>
+      </section>
+
+      <section class="track-section">
+        <div class="track-section-label">recent first lines</div>
+        <div class="recent-lines" id="recent-lines"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ----------------- CHEATSHEET ----------------- -->
+  <aside class="cheat" id="cheat" aria-hidden="true">
+    <button type="button" class="close-cheat" id="close-cheat">[esc] close</button>
+    <h3>shortcuts</h3>
+    <ul>
+      <li><span class="kbd">⌘</span><span class="kbd">B</span> toggle sidebar</li>
+      <li><span class="kbd">⌘</span><span class="kbd">P</span> prompt me</li>
+      <li><span class="kbd">⌘</span><span class="kbd">S</span> flush save now</li>
+      <li><span class="kbd">⌘</span><span class="kbd">⏎</span> publish block</li>
+      <li><span class="kbd">⌘</span><span class="kbd">T</span> open track</li>
+      <li><span class="kbd">⌘</span><span class="kbd">/</span> toggle this sheet</li>
+      <li><span class="kbd">esc</span> close overlay</li>
+    </ul>
+  </aside>
+
+  <div class="float-bar">
+    <button type="button" id="cheat-toggle" title="shortcuts (⌘/)">[?]</button>
+    <button type="button" id="theme-toggle" title="toggle dark/light">[☾]</button>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- theme (persist) ----------
+  const THEME_KEY = 'lifeOs.theme';
+  if (localStorage.getItem(THEME_KEY) === 'light') {
+    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.add('light');
+  }
+  const themeBtn = document.getElementById('theme-toggle');
+  function paintThemeGlyph() {
+    const isDark = document.documentElement.classList.contains('dark');
+    themeBtn.textContent = isDark ? '[☾]' : '[☼]';
+  }
+  paintThemeGlyph();
+  themeBtn.addEventListener('click', () => {
+    const isDark = document.documentElement.classList.contains('dark');
+    document.documentElement.classList.toggle('dark', !isDark);
+    document.documentElement.classList.toggle('light', isDark);
+    localStorage.setItem(THEME_KEY, isDark ? 'light' : 'dark');
+    paintThemeGlyph();
+  });
+
+  // ---------- accent + status ----------
+  const accent = lifeOs.applyAccent();
+  lifeOs.mountStatusLine(document.getElementById('status'), { page: 'WRITE', version: 'v0.1' });
+
+  // ---------- date helpers ----------
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function fmtDate(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+  function fmtTimeShort(d) { return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+  function fmtDateShort(d) {
+    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    return `${months[d.getMonth()]} ${pad(d.getDate())}`;
+  }
+  function fmtHMS(ms) {
+    const s = Math.floor(ms / 1000);
+    return `${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}:${pad(s%60)}`;
+  }
+
+  const today = new Date();
+  const dateStr = fmtDate(today);
+
+  // ---------- prompts (heavy, from PLAN.md §2.4) ----------
+  const PROMPTS = [
+    { id:'future_self', label:'future self · 3 months out', text:'a short note to your future self — three months from now.' },
+    { id:'past_self',   label:'past self · 1 year back',    text:'what would you tell yourself a year ago?' },
+    { id:'observation', label:'observation',                text:'someone you observed today — and what you took from them.' },
+    { id:'struggle',    label:'struggle',                   text:'where did you struggle today, and why? the honest version.' },
+    { id:'deep_question', label:'deep question',            text:'a bigger question that crossed your mind — the kind that won\'t fit in one line.' },
+    { id:'freeform',    label:'freeform',                   text:'no rules. just write.' },
+  ];
+
+  // ---------- localStorage keys ----------
+  const SK_SESSIONS  = (d) => `lifeOs.write.${d}.sessions`;     // [{n, started, prompt, text, lastEdit, ended, durationMs, committed}]
+  const SK_GOAL      = 'lifeOs.write.goal';
+  const SK_SCROLL    = (d) => `lifeOs.write.${d}.scroll`;
+  const SK_RAIL_TAB  = 'lifeOs.write.railTab';
+  const SK_RAIL_HIDE = 'lifeOs.write.railSilenced';
+  const SK_SIDE_COLL = 'lifeOs.write.sidebarCollapsed';
+  const SK_HISTORY   = 'lifeOs.history';   // shared with today.html
+
+  function loadSessions(d) {
+    try { return JSON.parse(localStorage.getItem(SK_SESSIONS(d)) || '[]'); }
+    catch (e) { return []; }
+  }
+  function saveSessions(d, arr) {
+    localStorage.setItem(SK_SESSIONS(d), JSON.stringify(arr));
+  }
+  function readHistory() {
+    try {
+      const r = JSON.parse(localStorage.getItem(SK_HISTORY) || '[]');
+      return Array.isArray(r) ? r : [];
+    } catch (e) { return []; }
+  }
+
+  // ---------- session model ----------
+  // Each "block" is one session entry. New session = new block prepended.
+  let sessions = loadSessions(dateStr);
+  if (sessions.length === 0) {
+    sessions.push({
+      n: 1,
+      started: Date.now(),
+      prompt: null,
+      text: '',
+      lastEdit: Date.now(),
+      durationMs: 0,
+      committed: false
+    });
+    saveSessions(dateStr, sessions);
+  }
+
+  const sessionStartMs = Date.now();
+  let totalTypedMs = 0;       // accumulates active-typing time (heuristic)
+  let lastInputAt = 0;
+
+  // ---------- render blocks ----------
+  const blocksHost = document.getElementById('blocks-host');
+
+  function blockHeaderText(s) {
+    const started = new Date(s.started);
+    const m = ['MAY 13']; // placeholder, replaced below
+    return `${fmtDateShort(started)} · ${fmtTimeShort(started)} · session ${s.n}`;
+  }
+
+  function renderBlock(s, idx) {
+    const block = document.createElement('article');
+    block.className = 'block';
+    block.dataset.n = s.n;
+    block.id = `block-${s.n}`;
+
+    // head
+    const head = document.createElement('header');
+    head.className = 'block-head';
+    const dot = document.createElement('span'); dot.className = 'dot'; head.appendChild(dot);
+    const ts = document.createElement('span');
+    ts.textContent = blockHeaderText(s);
+    head.appendChild(ts);
+    if (s.prompt) {
+      const sep = document.createElement('span'); sep.className = 'sep'; sep.textContent = '·'; head.appendChild(sep);
+      const pl = document.createElement('span');
+      pl.textContent = 'prompt: ' + s.prompt.label;
+      head.appendChild(pl);
+    }
+    const wordPill = document.createElement('span');
+    wordPill.className = 'word-pill';
+    wordPill.textContent = '0 words';
+    head.appendChild(wordPill);
+    if (s.committed) {
+      const pill = document.createElement('span');
+      pill.className = 'committed-pill';
+      pill.textContent = 'committed';
+      head.appendChild(pill);
+    }
+    block.appendChild(head);
+
+    // prompt strip
+    const strip = document.createElement('div');
+    strip.className = 'prompt-strip';
+    const promptBtn = document.createElement('button');
+    promptBtn.type = 'button';
+    promptBtn.className = 'chip-btn';
+    promptBtn.textContent = '[ prompt me ]';
+    promptBtn.addEventListener('click', () => insertPrompt(block, s));
+    strip.appendChild(promptBtn);
+    block.appendChild(strip);
+
+    // inline prompt header (if already set)
+    if (s.prompt) {
+      const pHead = document.createElement('div');
+      pHead.className = 'block-prompt';
+      pHead.textContent = s.prompt.text;
+      block.appendChild(pHead);
+    }
+
+    // textarea
+    const ta = document.createElement('textarea');
+    ta.className = 'write-area';
+    ta.placeholder = '// no rules. just write.';
+    ta.value = s.text || '';
+    ta.spellcheck = true;
+    if (mode === 'read') ta.readOnly = true;
+    // auto-grow
+    function grow() {
+      ta.style.height = 'auto';
+      ta.style.height = Math.max(240, ta.scrollHeight + 2) + 'px';
+    }
+    ta.addEventListener('input', () => {
+      grow();
+      handleInput(s, ta, wordPill);
+    });
+    block.appendChild(ta);
+    setTimeout(grow, 0);
+
+    // actions
+    const actions = document.createElement('div');
+    actions.className = 'block-actions';
+    const pubBtn = document.createElement('button');
+    pubBtn.type = 'button';
+    pubBtn.className = 'publish-btn' + (s.committed ? ' committed' : '');
+    const pubFill = document.createElement('span');
+    pubFill.className = 'commit-fill';
+    const pubLabel = document.createElement('span');
+    pubLabel.className = 'commit-label';
+    pubLabel.style.position = 'relative';
+    pubLabel.textContent = s.committed ? '[ re-commit ]' : '$ commit_session · ⌘⏎';
+    pubBtn.appendChild(pubFill);
+    pubBtn.appendChild(pubLabel);
+    attachHoldToPublish(pubBtn, pubFill, pubLabel, () => publishBlock(s, block, ta));
+    actions.appendChild(pubBtn);
+    block.appendChild(actions);
+
+    // initial word count
+    updateWordPill(ta.value, wordPill, s);
+
+    block.__ta = ta;
+    block.__wordPill = wordPill;
+    return block;
+  }
+
+  function renderAllBlocks() {
+    blocksHost.innerHTML = '';
+    // newest first
+    const sorted = sessions.slice().sort((a, b) => b.n - a.n);
+    sorted.forEach((s, i) => blocksHost.appendChild(renderBlock(s, i)));
+    refreshSidebarBlocks();
+  }
+
+  // ---------- input handling (debounced save + idle feedback) ----------
+  let saveTimer = null;
+  let idleTimer = null;
+  const SAVE_DEBOUNCE = 500;
+  const IDLE_DELAY = 5000;
+
+  function handleInput(s, ta, wordPill) {
+    s.text = ta.value;
+    s.lastEdit = Date.now();
+    lastInputAt = s.lastEdit;
+    updateWordPill(ta.value, wordPill, s);
+    updateSessionMeta();
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      saveSessions(dateStr, sessions);
+      markSaved();
+    }, SAVE_DEBOUNCE);
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => regenerateFeedback(), IDLE_DELAY);
+  }
+
+  function countWords(t) {
+    return (t || '').trim().split(/\s+/).filter(Boolean).length;
+  }
+
+  const FLASH_THRESHOLDS = [100, 250, 500, 1000];
+  function updateWordPill(text, pill, s) {
+    const w = countWords(text);
+    pill.textContent = w + (w === 1 ? ' word' : ' words');
+    s.lastWords = s.lastWords || 0;
+    for (const t of FLASH_THRESHOLDS) {
+      if (s.lastWords < t && w >= t) {
+        pill.classList.add('flash');
+        setTimeout(() => pill.classList.remove('flash'), 150);
+        break;
+      }
+    }
+    s.lastWords = w;
+  }
+
+  function markSaved() {
+    const el = document.getElementById('sb-saved');
+    el.textContent = `saved · ${fmtTimeShort(new Date())}`;
+  }
+
+  // ---------- sidebar meta ----------
+  let sessionEndedAt = null;  // when not null, timer freezes at (sessionEndedAt - sessionStartMs)
+  let mode = 'write';         // 'write' | 'read' — read pauses timer + autosave + makes textareas readonly
+  let modePausedAt = null;    // when in read mode, the wall-clock instant we paused at
+  function updateSessionMeta() {
+    const totalWords = sessions.reduce((sum, s) => sum + countWords(s.text), 0);
+    document.getElementById('sb-words').textContent = totalWords;
+    const nowOrFrozen = sessionEndedAt || modePausedAt || Date.now();
+    const elapsedMs = nowOrFrozen - sessionStartMs;
+    const timeEl = document.getElementById('sb-time');
+    timeEl.textContent = fmtHMS(elapsedMs);
+    timeEl.classList.toggle('session-ended', !!sessionEndedAt);
+    const minutes = elapsedMs / 60000;
+    const wpm = minutes > 0.1 ? Math.round(totalWords / minutes) : 0;
+    document.getElementById('sb-wpm').textContent = wpm;
+
+    const goal = parseInt(localStorage.getItem(SK_GOAL) || '0', 10);
+    const goalWrap = document.getElementById('sb-goal-wrap');
+    if (goal > 0) {
+      goalWrap.style.display = 'block';
+      document.getElementById('sb-goal-num').textContent = goal;
+      const pct = Math.max(0, Math.min(100, (totalWords / goal) * 100));
+      document.getElementById('sb-goal-fill').style.width = pct + '%';
+    } else {
+      goalWrap.style.display = 'none';
+    }
+  }
+  setInterval(updateSessionMeta, 1000);
+
+  // ---------- sidebar block list ----------
+  function refreshSidebarBlocks() {
+    const host = document.getElementById('sb-blocks');
+    host.innerHTML = '';
+    if (!sessions.length) {
+      const empty = document.createElement('div');
+      empty.style.color = 'var(--muted-2)';
+      empty.style.fontSize = '10px';
+      empty.textContent = '— none —';
+      host.appendChild(empty);
+      return;
+    }
+    sessions.slice().sort((a,b) => b.n - a.n).forEach(s => {
+      const a = document.createElement('a');
+      a.href = '#block-' + s.n;
+      const label = document.createElement('span');
+      label.textContent = `session ${s.n}`;
+      const meta = document.createElement('span');
+      meta.className = 'sb-row-meta';
+      const w = countWords(s.text);
+      meta.textContent = `${w}w`;
+      a.appendChild(label);
+      a.appendChild(meta);
+      host.appendChild(a);
+    });
+  }
+
+  // ---------- recent days (in sidebar) ----------
+  function refreshRecent() {
+    const host = document.getElementById('sb-recent');
+    host.innerHTML = '';
+    const days = [];
+    // scan last 14 days for any write sessions
+    for (let i = 1; i <= 14; i++) {
+      const d = new Date(today); d.setDate(today.getDate() - i);
+      const key = fmtDate(d);
+      try {
+        const raw = localStorage.getItem(SK_SESSIONS(key));
+        if (!raw) continue;
+        const arr = JSON.parse(raw);
+        if (!Array.isArray(arr) || !arr.length) continue;
+        const w = arr.reduce((s, x) => s + countWords(x.text), 0);
+        if (w === 0) continue;
+        const mins = Math.max(1, Math.round((arr.reduce((s,x)=>s+(x.durationMs||0),0))/60000));
+        days.push({ key, d, w, mins });
+      } catch (e) {}
+      if (days.length >= 7) break;
+    }
+    if (!days.length) {
+      const empty = document.createElement('div');
+      empty.style.color = 'var(--muted-2)';
+      empty.style.fontSize = '10px';
+      empty.textContent = '— no past days —';
+      host.appendChild(empty);
+      return;
+    }
+    days.forEach(day => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      const label = document.createElement('span');
+      label.textContent = fmtDateShort(day.d);
+      const meta = document.createElement('span');
+      meta.className = 'sb-row-meta';
+      meta.textContent = `${day.w}w · ${day.mins}m`;
+      b.appendChild(label);
+      b.appendChild(meta);
+      b.addEventListener('click', () => openDayViewer(day.key));
+      host.appendChild(b);
+    });
+  }
+  refreshRecent();
+
+  function openDayViewer(key) {
+    // tiny read-only viewer: drop in canvas as a block above the current ones (transient)
+    let viewer = document.getElementById('day-viewer');
+    if (viewer) viewer.remove();
+    viewer = document.createElement('section');
+    viewer.id = 'day-viewer';
+    viewer.style.borderTop = '1px solid var(--border)';
+    viewer.style.borderBottom = '1px solid var(--border)';
+    viewer.style.padding = '18px 0';
+    viewer.style.margin = '0 0 32px';
+    const h = document.createElement('div');
+    h.className = 'q-label';
+    h.innerHTML = `<span style="color:var(--accent)">VIEWING</span> · ${key} · <button id="close-viewer" style="background:transparent;border:0;color:var(--muted);cursor:pointer;font-family:var(--font-mono);font-size:10px;letter-spacing:var(--wide);text-transform:uppercase;">[ close ]</button>`;
+    viewer.appendChild(h);
+    try {
+      const arr = JSON.parse(localStorage.getItem(SK_SESSIONS(key)) || '[]');
+      arr.forEach(s => {
+        const pre = document.createElement('div');
+        pre.style.fontFamily = 'var(--font-sans)';
+        pre.style.fontSize = '15px';
+        pre.style.lineHeight = '1.7';
+        pre.style.color = 'var(--muted)';
+        pre.style.padding = '12px 0';
+        pre.style.borderTop = '1px solid var(--border)';
+        pre.style.whiteSpace = 'pre-wrap';
+        pre.textContent = (s.text || '').trim() || '(empty session)';
+        viewer.appendChild(pre);
+      });
+    } catch (e) {
+      const err = document.createElement('div');
+      err.textContent = '// could not read';
+      viewer.appendChild(err);
+    }
+    blocksHost.parentNode.insertBefore(viewer, blocksHost);
+    document.getElementById('close-viewer').addEventListener('click', () => viewer.remove());
+  }
+
+  // ---------- new block / new session ----------
+  function newBlock(promptObj) {
+    const n = (sessions.reduce((m, s) => Math.max(m, s.n), 0) || 0) + 1;
+    sessions.push({
+      n, started: Date.now(),
+      prompt: promptObj || null,
+      text: '', lastEdit: Date.now(),
+      durationMs: 0, committed: false
+    });
+    saveSessions(dateStr, sessions);
+    renderAllBlocks();
+    // focus newest
+    const fresh = document.getElementById('block-' + n);
+    if (fresh && fresh.__ta) fresh.__ta.focus();
+    return n;
+  }
+  document.getElementById('new-block').addEventListener('click', () => newBlock(null));
+
+  // ---------- prompt insertion ----------
+  let lastPromptIdx = -1;
+  function pickPrompt() {
+    let i = Math.floor(Math.random() * PROMPTS.length);
+    if (i === lastPromptIdx) i = (i + 1) % PROMPTS.length;
+    lastPromptIdx = i;
+    return PROMPTS[i];
+  }
+  function insertPrompt(block, s) {
+    const p = pickPrompt();
+    s.prompt = p;
+    saveSessions(dateStr, sessions);
+    renderAllBlocks();
+    const fresh = document.getElementById('block-' + s.n);
+    if (fresh && fresh.__ta) fresh.__ta.focus();
+  }
+  function globalPrompt() {
+    // pick the topmost (newest) empty block, or create a new one
+    const empty = sessions.slice().sort((a,b)=>b.n-a.n).find(s => !s.text || !s.text.trim());
+    if (empty) {
+      empty.prompt = pickPrompt();
+      saveSessions(dateStr, sessions);
+      renderAllBlocks();
+      const fresh = document.getElementById('block-' + empty.n);
+      if (fresh && fresh.__ta) fresh.__ta.focus();
+    } else {
+      newBlock(pickPrompt());
+    }
+  }
+  document.getElementById('prompt-me').addEventListener('click', globalPrompt);
+
+  // ---------- publish ----------
+  async function publishBlock(s, blockEl, ta) {
+    s.text = ta.value;
+    s.durationMs = (s.durationMs || 0) + Math.max(0, Date.now() - sessionStartMs);
+    const startedWeekday = ['SUN','MON','TUE','WED','THU','FRI','SAT'][new Date(s.started).getDay()];
+    const entry = {
+      date: dateStr,
+      weekday: startedWeekday,
+      accent: { name: accent.name, hex: accent.hex },
+      saved_at: new Date().toISOString(),
+      questions: [
+        { id: 'free', type: 'longtext', label: 'Anywhere your mind wants to go', value: ta.value }
+      ],
+      source: 'write.html',
+      session_meta: {
+        duration_ms: s.durationMs,
+        words: countWords(ta.value),
+        words_per_min: parseInt(document.getElementById('sb-wpm').textContent, 10) || 0,
+        prompt: s.prompt ? s.prompt.id : null,
+        session_n: s.n
+      }
+    };
+    // persist locally regardless
+    localStorage.setItem(`lifeOs.write.lastEntry.${dateStr}.${s.n}`, JSON.stringify(entry));
+
+    // mark visually
+    blockEl.classList.add('pulse-accent');
+    setTimeout(() => blockEl.classList.remove('pulse-accent'), 1000);
+
+    // optimistic loading state for rail
+    setRailSource('feedback · …');
+
+    // try server
+    let serverFb = null;
+    const t0 = Date.now();
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 12000);
+      const res = await fetch('http://localhost:5757/api/journal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entry }),
+        signal: ctrl.signal
+      });
+      clearTimeout(tid);
+      if (res.ok) serverFb = await res.json();
+    } catch (e) { /* silent fallback */ }
+    // if server didn't supply latency, inject our measured value
+    if (serverFb && serverFb.meta && typeof serverFb.meta.latency_ms !== 'number') {
+      serverFb.meta.latency_ms = Date.now() - t0;
+    }
+
+    s.committed = true;
+    saveSessions(dateStr, sessions);
+
+    // also append to history so archive picks it up
+    try {
+      const arr = readHistory().filter(h => !(h.date === dateStr && h.source === 'write.html' && h.session_n === s.n));
+      const oneliner = ta.value.trim().split('\n')[0].slice(0, 200);
+      arr.push({
+        date: dateStr,
+        mood: null,
+        color: accent.hex,
+        emoji: '',
+        oneliner,
+        values: { free: ta.value },
+        source: 'write.html',
+        session_n: s.n
+      });
+      arr.sort((a,b) => a.date.localeCompare(b.date));
+      localStorage.setItem(SK_HISTORY, JSON.stringify(arr.slice(-200)));
+    } catch (e) {}
+
+    renderAllBlocks();
+
+    if (serverFb) {
+      renderServerFeedback(serverFb);
+    } else {
+      // staged note — restore live label, push a note into reflect
+      setRailSource('feedback · live · rules');
+      pushRailItem('reflect', { obs: '// no server — entry staged; ask Claude to commit' });
+    }
+  }
+
+  // ---------- feedback rail ----------
+  // mode: 'live' (rule-based, tab UI shown) or 'server' (canonical insight schema, full layout)
+  let railMode = 'live';
+  let railTab = localStorage.getItem(SK_RAIL_TAB) || 'english';
+  let railItems = { english: [], reflect: [] };
+  let serverInsight = null;
+
+  function setRailSource(label) {
+    const el = document.getElementById('rail-source-pill');
+    if (el) el.textContent = label;
+  }
+  setRailSource('feedback · live · rules');
+
+  function setRailTab(t) {
+    railTab = t;
+    localStorage.setItem(SK_RAIL_TAB, t);
+    document.querySelectorAll('.rail-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+    if (railMode === 'live') renderRail();
+  }
+  document.querySelectorAll('.rail-tab').forEach(b => {
+    b.addEventListener('click', () => {
+      // tabs only meaningful in live mode; clicking in server mode re-renders server view
+      if (railMode === 'server') {
+        railMode = 'live';
+        setRailSource('feedback · live · rules');
+        document.querySelectorAll('.rail-tab').forEach(x => x.style.display = '');
+      }
+      setRailTab(b.dataset.tab);
+    });
+  });
+  setRailTab(railTab);
+
+  function renderRail() {
+    const body = document.getElementById('rail-body');
+    body.innerHTML = '';
+    if (railMode === 'server' && serverInsight) {
+      renderRailServer(body, serverInsight);
+      return;
+    }
+    const items = railItems[railTab];
+    if (!items || !items.length) {
+      const empty = document.createElement('div');
+      empty.className = 'rail-empty';
+      empty.textContent = railTab === 'english'
+        ? '// english upgrades will surface here'
+        : '// observations will surface here';
+      body.appendChild(empty);
+      return;
+    }
+    items.slice(0, 3).forEach(it => {
+      const div = document.createElement('div');
+      div.className = 'rail-item';
+      if (railTab === 'english') {
+        const o = document.createElement('span'); o.className = 'rail-orig'; o.textContent = it.original || '';
+        const a = document.createElement('span'); a.className = 'rail-arrow'; a.textContent = '→';
+        const u = document.createElement('span'); u.className = 'rail-upg'; u.textContent = it.suggested || '';
+        div.appendChild(o); div.appendChild(a); div.appendChild(u);
+        if (it.note) {
+          const n = document.createElement('span'); n.className = 'rail-note'; n.textContent = it.note;
+          div.appendChild(n);
+        }
+      } else {
+        const o = document.createElement('div'); o.className = 'rail-obs'; o.textContent = it.obs || '';
+        div.appendChild(o);
+      }
+      body.appendChild(div);
+    });
+  }
+
+  // canonical insight-schema renderer (english + reflect + patterns + tomorrow)
+  function renderRailServer(body, fb) {
+    body.innerHTML = '';
+
+    // ENGLISH section
+    const eng = Array.isArray(fb.english) ? fb.english.slice(0, 3) : [];
+    if (eng.length) {
+      const hdr = document.createElement('div');
+      hdr.className = 'rail-section-label';
+      hdr.innerHTML = 'english <span class="count">(' + eng.length + ')</span>';
+      body.appendChild(hdr);
+      eng.forEach((it, i) => {
+        const div = document.createElement('div');
+        div.className = 'rail-item';
+        div.dataset.channel = 'english';
+        div.dataset.index = String(i);
+        div.dataset.snapshot = it.suggested || '';
+        const o = document.createElement('span'); o.className = 'rail-orig'; o.textContent = it.original || '';
+        const a = document.createElement('span'); a.className = 'rail-arrow'; a.textContent = '→';
+        const u = document.createElement('span'); u.className = 'rail-upg'; u.textContent = it.suggested || '';
+        div.appendChild(o); div.appendChild(a); div.appendChild(u);
+        if (it.note) {
+          const n = document.createElement('span'); n.className = 'rail-note'; n.textContent = it.note;
+          div.appendChild(n);
+        }
+        attachReplyUI(div, 'english', i, it.suggested || '');
+        body.appendChild(div);
+      });
+    }
+
+    // REFLECT section
+    const ref = Array.isArray(fb.reflect) ? fb.reflect.slice(0, 3) : [];
+    if (ref.length) {
+      const hdr = document.createElement('div');
+      hdr.className = 'rail-section-label';
+      hdr.innerHTML = 'reflect <span class="count">(' + ref.length + ')</span>';
+      body.appendChild(hdr);
+      ref.forEach((r, i) => {
+        const div = document.createElement('div');
+        div.className = 'rail-item';
+        div.dataset.channel = 'reflect';
+        div.dataset.index = String(i);
+        div.dataset.snapshot = r.observation || '';
+        const o = document.createElement('div'); o.className = 'rail-obs';
+        o.textContent = r.observation || '';
+        if (r.kind) {
+          const k = document.createElement('span'); k.className = 'rail-kind'; k.textContent = r.kind;
+          o.appendChild(k);
+        }
+        div.appendChild(o);
+        if (Array.isArray(r.evidence) && r.evidence.length) {
+          r.evidence.slice(0, 2).forEach(ev => {
+            const e = document.createElement('span'); e.className = 'rail-evidence';
+            const dt = document.createElement('span'); dt.className = 'ev-date'; dt.textContent = ev.source_date || '';
+            const q = document.createElement('span'); q.textContent = ev.quote ? '"' + ev.quote + '"' : '';
+            e.appendChild(dt); e.appendChild(q);
+            div.appendChild(e);
+          });
+        }
+        attachReplyUI(div, 'reflect', i, r.observation || '');
+        body.appendChild(div);
+      });
+    }
+
+    // PATTERNS section
+    const pats = Array.isArray(fb.patterns) ? fb.patterns.slice(0, 3) : [];
+    if (pats.length) {
+      const hdr = document.createElement('div');
+      hdr.className = 'rail-section-label';
+      hdr.textContent = 'patterns';
+      body.appendChild(hdr);
+      pats.forEach(p => {
+        const div = document.createElement('div'); div.className = 'rail-pattern'; div.textContent = p;
+        body.appendChild(div);
+      });
+    }
+
+    // TOMORROW
+    if (fb.prompt_for_tomorrow) {
+      const hdr = document.createElement('div');
+      hdr.className = 'rail-section-label';
+      hdr.textContent = 'tomorrow';
+      body.appendChild(hdr);
+      const t = document.createElement('div'); t.className = 'rail-tomorrow';
+      t.textContent = '// ' + fb.prompt_for_tomorrow;
+      body.appendChild(t);
+    }
+  }
+
+  function pushRailItem(channel, item) {
+    railItems[channel] = [item, ...(railItems[channel] || [])].slice(0, 3);
+    if (railMode === 'live' && channel === railTab) renderRail();
+    // fade after 30s
+    setTimeout(() => {
+      railItems[channel] = railItems[channel].filter(x => x !== item);
+      if (railMode === 'live' && channel === railTab) renderRail();
+    }, 30000);
+  }
+
+  function renderServerFeedback(fb) {
+    // canonical insight.response.json shape
+    serverInsight = fb;
+    railMode = 'server';
+    const meta = fb && fb.meta ? fb.meta : {};
+    const src = meta.source || 'rules';
+    const latency = (typeof meta.latency_ms === 'number') ? (meta.latency_ms / 1000).toFixed(1) + 's' : '—';
+    setRailSource('feedback · ' + src + ' · ' + latency);
+    // hide tab UI while showing server response (full layout)
+    document.querySelectorAll('.rail-tab').forEach(x => x.style.display = 'none');
+    renderRail();
+    // re-attach any cached thread turns under their anchored items
+    reattachConversation();
+  }
+
+  // ---------- conversation reply UI (v1.2) ----------
+  const SK_CONV = (d) => 'lifeOs.conversation.' + d;
+  let conversationThread = null;       // server-shaped { turns: [...] } if loaded
+  let pendingConversation = null;      // network thread waiting for rail to render
+
+  function loadConversationCache(d) {
+    try { return JSON.parse(localStorage.getItem(SK_CONV(d)) || 'null'); }
+    catch (e) { return null; }
+  }
+  function saveConversationCache(d, thread) {
+    try { localStorage.setItem(SK_CONV(d), JSON.stringify(thread)); } catch (e) {}
+  }
+
+  function attachReplyUI(itemDiv, channel, index, snapshot) {
+    // append the [ reply ] toggle
+    const toggle = document.createElement('span');
+    toggle.className = 'reply-toggle';
+    toggle.textContent = '[ reply ]';
+    itemDiv.appendChild(toggle);
+
+    // reply box (collapsed by default)
+    const box = document.createElement('div');
+    box.className = 'reply-box';
+    const ta = document.createElement('textarea');
+    ta.setAttribute('rows', '3');
+    ta.placeholder = 'reply…';
+    const sendRow = document.createElement('div');
+    sendRow.className = 'send-row';
+    const status = document.createElement('span');
+    status.className = 'send-status';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn';
+    btn.textContent = '[ send ]';
+    sendRow.appendChild(status);
+    sendRow.appendChild(btn);
+    box.appendChild(ta);
+    box.appendChild(sendRow);
+    itemDiv.appendChild(box);
+
+    // thread container (turns render here)
+    const thread = document.createElement('div');
+    thread.className = 'thread';
+    thread.style.display = 'none';
+    itemDiv.appendChild(thread);
+
+    function openBox() {
+      box.classList.add('open');
+      setTimeout(() => ta.focus(), 0);
+    }
+    function closeBox() {
+      box.classList.remove('open');
+      ta.value = '';
+      status.textContent = '';
+    }
+    function setSending(on) {
+      btn.disabled = on;
+      ta.disabled = on;
+      status.textContent = on ? '// sending…' : '';
+    }
+    async function send() {
+      const text = ta.value.trim();
+      if (!text) return;
+      setSending(true);
+      // drop any prior error line in the thread
+      Array.from(thread.querySelectorAll('.thread-error')).forEach(n => n.remove());
+      try {
+        const res = await fetch('http://localhost:5757/api/journal/reply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: dateStr,
+            user_text: text,
+            anchor: { channel: channel, index: index, snapshot: snapshot }
+          })
+        });
+        if (!res.ok) throw new Error('http ' + res.status);
+        const data = await res.json();
+        // append the user turn we just sent + the assistant turn
+        renderThreadTurn(thread, 'user', text, null);
+        if (data && data.assistant_turn) {
+          const at = data.assistant_turn;
+          renderThreadTurn(thread, 'assistant', at.text || '', at.latency_ms);
+        }
+        thread.style.display = '';
+        closeBox();
+        toggle.textContent = '[ reply again ]';
+        // cache the full thread returned by the server
+        if (data && data.thread) {
+          conversationThread = data.thread;
+          saveConversationCache(dateStr, data.thread);
+        }
+      } catch (e) {
+        const err = document.createElement('div');
+        err.className = 'thread-error';
+        err.textContent = '// no reply — server unreachable';
+        thread.appendChild(err);
+        thread.style.display = '';
+      } finally {
+        setSending(false);
+      }
+    }
+
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (box.classList.contains('open')) closeBox();
+      else openBox();
+    });
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        send();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeBox();
+      }
+    });
+    btn.addEventListener('click', send);
+  }
+
+  function renderThreadTurn(threadEl, role, text, latencyMs) {
+    const div = document.createElement('div');
+    div.className = 'thread-turn';
+    const r = document.createElement('span');
+    r.className = 'thread-role' + (role === 'assistant' ? ' assistant' : '');
+    r.textContent = role === 'assistant' ? 'gemini' : 'you';
+    const t = document.createElement('span');
+    t.className = 'thread-text';
+    t.textContent = text || '';
+    div.appendChild(r);
+    div.appendChild(t);
+    if (role === 'assistant' && typeof latencyMs === 'number') {
+      const lat = document.createElement('span');
+      lat.className = 'thread-latency';
+      lat.textContent = '· ' + (latencyMs / 1000).toFixed(1) + 's';
+      div.appendChild(lat);
+      // tiny continue-chip on assistant turns
+      const more = document.createElement('span');
+      more.className = 'reply-toggle';
+      more.textContent = '[ reply ]';
+      more.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // find the host item and open its reply-box
+        const host = threadEl.parentElement;
+        if (!host) return;
+        const box = host.querySelector(':scope > .reply-box');
+        if (!box) return;
+        box.classList.add('open');
+        const ta = box.querySelector('textarea');
+        if (ta) setTimeout(() => ta.focus(), 0);
+      });
+      div.appendChild(more);
+    }
+    threadEl.appendChild(div);
+  }
+
+  function reattachConversation() {
+    // Use latest thread (live conversationThread > cache) and bind turns to anchored items.
+    const thread = conversationThread || pendingConversation || loadConversationCache(dateStr);
+    if (!thread || !Array.isArray(thread.turns) || !thread.turns.length) return;
+    conversationThread = thread;
+
+    // group turns by anchor (channel + index)
+    const groups = new Map();
+    thread.turns.forEach(turn => {
+      const a = turn.anchor || {};
+      if (!a.channel || typeof a.index !== 'number') return;
+      const key = a.channel + ':' + a.index;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(turn);
+    });
+
+    groups.forEach((turns, key) => {
+      const [ch, idxStr] = key.split(':');
+      const host = document.querySelector('.rail-item[data-channel="' + ch + '"][data-index="' + idxStr + '"]');
+      if (!host) return;
+      const threadEl = host.querySelector(':scope > .thread');
+      const toggle = host.querySelector(':scope > .reply-toggle');
+      if (!threadEl) return;
+      threadEl.innerHTML = '';
+      turns.forEach(t => {
+        renderThreadTurn(threadEl, t.role === 'assistant' ? 'assistant' : 'user', t.text || '', (t.role === 'assistant' ? t.latency_ms : null));
+      });
+      threadEl.style.display = '';
+      if (toggle) toggle.textContent = '[ reply again ]';
+    });
+
+    pendingConversation = null;
+  }
+
+  // initial fetch of today's conversation (prefer network; fallback to cache).
+  async function bootConversation() {
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 1200);
+      const res = await fetch('http://localhost:5757/api/journal/conversation/' + dateStr, { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (res.ok) {
+        const data = await res.json();
+        // accept either { thread: {...} } or the thread itself
+        const thread = (data && data.thread) ? data.thread : data;
+        if (thread && Array.isArray(thread.turns) && thread.turns.length) {
+          conversationThread = thread;
+          saveConversationCache(dateStr, thread);
+          if (railMode === 'server') reattachConversation();
+          else pendingConversation = thread;
+        }
+        return;
+      }
+    } catch (e) { /* network unreachable */ }
+    // fallback: cache
+    const cached = loadConversationCache(dateStr);
+    if (cached && Array.isArray(cached.turns) && cached.turns.length) {
+      conversationThread = cached;
+      if (railMode === 'server') reattachConversation();
+      else pendingConversation = cached;
+    }
+  }
+
+  // ---------- live reflect (rule-based only — no network during typing) ----------
+  function regenerateFeedback() {
+    // don't override server insight after a publish
+    if (railMode === 'server') return;
+    const allText = sessions.map(s => s.text || '').join('\n\n').trim();
+    if (allText.length < 80) return;
+
+    // english channel — rule-based
+    const eng = englishRuleFallback(allText);
+    if (eng.length) {
+      railItems.english = eng.slice(0, 3);
+      if (railTab === 'english') renderRail();
+    }
+
+    // reflect channel — rule-based
+    const obs = reflectObservations(allText);
+    if (obs.length) {
+      railItems.reflect = obs.slice(0, 3).map(o => ({ obs: o }));
+      if (railTab === 'reflect') renderRail();
+    }
+  }
+
+  function englishRuleFallback(text) {
+    const items = [];
+    const pairs = [
+      [/\bI was really tired\b/i, 'I was really tired', 'I was wiped', 'idiomatic writing often uses sharper words for "tired" — wiped, spent, beat.'],
+      [/\bcould not\b/i, 'could not', 'couldn\'t', 'casual writing contracts these — "couldn\'t", "didn\'t", "wasn\'t".'],
+      [/\bvery good\b/i, 'very good', 'solid', '"very good" is flat. try "solid", "sharp", "on point".'],
+      [/\bvery bad\b/i, 'very bad', 'rough', '"very bad" is flat. try "rough", "ugly", "off".'],
+      [/\bI want to say\b/i, 'I want to say', 'I\'ll say', 'cleaner — drop the preamble.'],
+      [/\bin order to\b/i, 'in order to', 'to', '"in order to" is usually just "to".'],
+      [/\bdue to the fact that\b/i, 'due to the fact that', 'because', 'shorter is sharper.'],
+    ];
+    for (const [re, orig, sug, note] of pairs) {
+      if (re.test(text)) items.push({ original: orig, suggested: sug, note });
+      if (items.length >= 3) break;
+    }
+    return items;
+  }
+
+  function reflectObservations(text) {
+    const lower = text.toLowerCase();
+    const out = [];
+
+    // hedges
+    const hedges = ['maybe','i guess','probably','kind of','sort of','i think'];
+    let hedgeCount = 0;
+    hedges.forEach(h => {
+      const m = lower.match(new RegExp('\\b' + h.replace(/ /g,'\\s+') + '\\b', 'g'));
+      if (m) hedgeCount += m.length;
+    });
+    if (hedgeCount >= 4) out.push(`you're hedging — "${hedges[0]}/${hedges[2]}/..." showed up ${hedgeCount}x. okay if intentional.`);
+
+    // should/must/have to
+    const obls = ['should','must','have to','need to','ought to'];
+    let obCount = 0;
+    obls.forEach(h => {
+      const m = lower.match(new RegExp('\\b' + h.replace(/ /g,'\\s+') + '\\b', 'g'));
+      if (m) obCount += m.length;
+    });
+    if (obCount >= 4) out.push(`obligation words ("${obls[0]}"/"${obls[2]}") used ${obCount}x — a tell.`);
+
+    // word repetition (over 4 letters, freq >=4)
+    const tokens = lower.replace(/[^a-z\s']/g,' ').split(/\s+/).filter(w => w.length > 4);
+    const STOP = new Set(['about','after','again','because','before','being','could','every','first','found','given','going','great','having','knows','known','later','might','never','often','other','people','place','right','seems','small','still','their','there','these','thing','think','those','today','tomorrow','until','while','would','years','really','quite','where','which']);
+    const freq = {};
+    tokens.forEach(w => { if (!STOP.has(w)) freq[w] = (freq[w]||0) + 1; });
+    const top = Object.entries(freq).filter(([w,c]) => c >= 4).sort((a,b)=>b[1]-a[1]).slice(0,1);
+    if (top.length) out.push(`you've used "${top[0][0]}" ${top[0][1]}x — a tell.`);
+
+    // short-sentence cluster
+    const sents = text.split(/[.!?\n]+/).map(s => s.trim()).filter(Boolean);
+    let shortRun = 0, maxRun = 0;
+    sents.forEach(s => {
+      const w = s.split(/\s+/).filter(Boolean).length;
+      if (w > 0 && w < 5) { shortRun++; maxRun = Math.max(maxRun, shortRun); }
+      else shortRun = 0;
+    });
+    if (maxRun >= 4) out.push(`a cluster of very short sentences — could be punchy or rushed.`);
+
+    // cross-day echoes
+    const hist = readHistory();
+    const paragraphs = text.split(/\n\s*\n/).map(p => p.trim()).filter(p => p.length > 30);
+    if (paragraphs.length) {
+      const lastPara = paragraphs[paragraphs.length - 1].toLowerCase();
+      const words = new Set(lastPara.split(/\s+/).filter(w => w.length > 4 && !STOP.has(w)));
+      for (let i = hist.length - 1; i >= 0; i--) {
+        const h = hist[i];
+        if (h.date === dateStr) continue;
+        const old = (h.oneliner || '').toLowerCase();
+        if (!old) continue;
+        const oldWords = old.split(/\s+/).filter(w => w.length > 4);
+        const shared = oldWords.filter(w => words.has(w));
+        if (shared.length >= 3) {
+          out.push(`this echoes ${h.date}: "${h.oneliner.slice(0, 60)}…"`);
+          break;
+        }
+      }
+    }
+
+    return out;
+  }
+
+  // ---------- silence rail ----------
+  const rail = document.getElementById('rail');
+  const unsilenceBtn = document.getElementById('unsilence');
+  function applyRailSilence() {
+    const silenced = localStorage.getItem(SK_RAIL_HIDE) === '1';
+    rail.classList.toggle('silenced', silenced);
+    unsilenceBtn.classList.toggle('shown', silenced);
+    document.getElementById('shell').classList.toggle('with-rail', !silenced);
+  }
+  document.getElementById('silence-rail').addEventListener('click', () => {
+    localStorage.setItem(SK_RAIL_HIDE, '1');
+    applyRailSilence();
+  });
+  unsilenceBtn.addEventListener('click', () => {
+    localStorage.setItem(SK_RAIL_HIDE, '0');
+    applyRailSilence();
+  });
+  applyRailSilence();
+
+  // ---------- sidebar collapse ----------
+  const shellEl = document.getElementById('shell');
+  const sidebarEl = document.getElementById('sidebar');
+  function applySidebar() {
+    const c = localStorage.getItem(SK_SIDE_COLL) === '1';
+    sidebarEl.classList.toggle('collapsed', c);
+    shellEl.classList.toggle('sidebar-collapsed', c);
+  }
+  function toggleSidebar() {
+    const c = localStorage.getItem(SK_SIDE_COLL) === '1';
+    localStorage.setItem(SK_SIDE_COLL, c ? '0' : '1');
+    applySidebar();
+  }
+  document.getElementById('collapse-sb').addEventListener('click', toggleSidebar);
+  document.getElementById('sb-expand-icon').addEventListener('click', toggleSidebar);
+  applySidebar();
+
+  // ---------- set goal ----------
+  document.getElementById('set-goal').addEventListener('click', () => {
+    const cur = localStorage.getItem(SK_GOAL) || '';
+    const v = prompt('daily word goal? (blank to clear)', cur);
+    if (v === null) return;
+    const n = parseInt(v, 10);
+    if (!v.trim()) localStorage.removeItem(SK_GOAL);
+    else if (!isNaN(n) && n > 0) localStorage.setItem(SK_GOAL, String(n));
+    updateSessionMeta();
+  });
+
+  // ---------- read mode: detailed feedback loader ----------
+  let readDetailLoadedFor = null;  // date string we've already loaded for, to avoid refetching
+  async function loadReadDetail(force) {
+    const status = document.getElementById('read-detail-status');
+    const body = document.getElementById('read-detail-body');
+    if (!status || !body) return;
+    if (!force && readDetailLoadedFor === dateStr) return;
+
+    status.textContent = '// loading feedback…';
+    body.innerHTML = '';
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch('http://localhost:5757/api/journal/feedback/' + dateStr, { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (res.status === 404) {
+        status.textContent = '// no feedback yet for ' + dateStr + ' — commit a block to get one.';
+        readDetailLoadedFor = dateStr;
+        return;
+      }
+      if (!res.ok) throw new Error('http ' + res.status);
+      const fb = await res.json();
+      readDetailLoadedFor = dateStr;
+      renderReadDetail(fb, status, body);
+    } catch (e) {
+      status.textContent = '// feedback unavailable (network or server) — try toggling again.';
+    }
+  }
+
+  function renderReadDetail(fb, status, body) {
+    status.textContent = '';
+    body.innerHTML = '';
+
+    const eng = Array.isArray(fb.english) ? fb.english : [];
+    const ref = Array.isArray(fb.reflect) ? fb.reflect : [];
+    const pats = Array.isArray(fb.patterns) ? fb.patterns : [];
+
+    if (!eng.length && !ref.length && !pats.length && !fb.prompt_for_tomorrow) {
+      status.textContent = '// feedback exists but is empty.';
+      return;
+    }
+
+    // ENGLISH — show ALL, with notes
+    if (eng.length) {
+      const sec = document.createElement('section');
+      sec.className = 'rd-section';
+      const hdr = document.createElement('div');
+      hdr.className = 'rd-section-label';
+      hdr.innerHTML = 'english refinements <span class="count">(' + eng.length + ')</span>';
+      sec.appendChild(hdr);
+      eng.forEach(it => {
+        const row = document.createElement('div');
+        row.className = 'rd-item';
+        const top = document.createElement('div');
+        top.className = 'rd-eng-row';
+        const o = document.createElement('span'); o.className = 'orig'; o.textContent = it.original || '';
+        const a = document.createElement('span'); a.className = 'arrow'; a.textContent = '→';
+        const u = document.createElement('span'); u.className = 'upg'; u.textContent = it.suggested || '';
+        top.appendChild(o); top.appendChild(a); top.appendChild(u);
+        row.appendChild(top);
+        if (it.note) {
+          const n = document.createElement('div'); n.className = 'rd-note'; n.textContent = '// ' + it.note;
+          row.appendChild(n);
+        }
+        sec.appendChild(row);
+      });
+      body.appendChild(sec);
+    }
+
+    // REFLECT — show ALL with full evidence
+    if (ref.length) {
+      const sec = document.createElement('section');
+      sec.className = 'rd-section';
+      const hdr = document.createElement('div');
+      hdr.className = 'rd-section-label';
+      hdr.innerHTML = 'reflections <span class="count">(' + ref.length + ')</span>';
+      sec.appendChild(hdr);
+      ref.forEach(r => {
+        const row = document.createElement('div');
+        row.className = 'rd-item';
+        const obs = document.createElement('div'); obs.className = 'rd-obs';
+        obs.textContent = r.observation || '';
+        if (r.kind) {
+          const k = document.createElement('span'); k.className = 'kind'; k.textContent = r.kind;
+          obs.appendChild(k);
+        }
+        row.appendChild(obs);
+        if (Array.isArray(r.evidence) && r.evidence.length) {
+          r.evidence.forEach(ev => {
+            const e = document.createElement('div'); e.className = 'rd-evidence';
+            const dt = document.createElement('span'); dt.className = 'date'; dt.textContent = ev.source_date || '—';
+            const q = document.createElement('span'); q.className = 'quote';
+            q.textContent = ev.quote ? '"' + ev.quote + '"' : '';
+            e.appendChild(dt); e.appendChild(q);
+            row.appendChild(e);
+          });
+        }
+        sec.appendChild(row);
+      });
+      body.appendChild(sec);
+    }
+
+    // PATTERNS — full list
+    if (pats.length) {
+      const sec = document.createElement('section');
+      sec.className = 'rd-section';
+      const hdr = document.createElement('div');
+      hdr.className = 'rd-section-label';
+      hdr.innerHTML = 'patterns <span class="count">(' + pats.length + ')</span>';
+      sec.appendChild(hdr);
+      pats.forEach(p => {
+        const d = document.createElement('div'); d.className = 'rd-pattern'; d.textContent = p;
+        sec.appendChild(d);
+      });
+      body.appendChild(sec);
+    }
+
+    // TOMORROW
+    if (fb.prompt_for_tomorrow) {
+      const sec = document.createElement('section');
+      sec.className = 'rd-section';
+      const hdr = document.createElement('div');
+      hdr.className = 'rd-section-label';
+      hdr.textContent = 'prompt for tomorrow';
+      sec.appendChild(hdr);
+      const t = document.createElement('div'); t.className = 'rd-tomorrow';
+      t.textContent = fb.prompt_for_tomorrow;
+      sec.appendChild(t);
+      body.appendChild(sec);
+    }
+  }
+
+  // ---------- write / read mode toggle ----------
+  function setMode(next) {
+    if (next !== 'write' && next !== 'read') return;
+    if (next === mode) return;
+
+    const hintEl = document.getElementById('mode-hint');
+
+    if (next === 'read') {
+      // pause: freeze timer, blur, lock textareas, dim compose UI
+      modePausedAt = Date.now();
+      mode = 'read';
+      document.body.classList.add('mode-read');
+      document.querySelectorAll('#blocks-host textarea').forEach(t => { t.readOnly = true; });
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+      hintEl.innerHTML = 'reading · <span class="v">timer paused</span>';
+      loadReadDetail();
+      // scroll the detail panel into view
+      requestAnimationFrame(() => {
+        const el = document.getElementById('read-detail');
+        if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    } else {
+      // resume: shift sessionStartMs forward by the paused duration so elapsed is preserved
+      // skip if session is already ended (timer is frozen at sessionEndedAt anyway)
+      if (modePausedAt && !sessionEndedAt) {
+        sessionStartMs += (Date.now() - modePausedAt);
+      }
+      modePausedAt = null;
+      mode = 'write';
+      document.body.classList.remove('mode-read');
+      document.querySelectorAll('#blocks-host textarea').forEach(t => { t.readOnly = false; });
+      hintEl.innerHTML = 'composing · <span class="v">timer running</span>';
+      // focus the most recent textarea so the user can immediately type
+      const tas = document.querySelectorAll('#blocks-host textarea');
+      if (tas.length) {
+        const last = tas[tas.length - 1];
+        last.focus();
+        const len = last.value.length;
+        try { last.setSelectionRange(len, len); } catch (e) {}
+      }
+    }
+
+    document.querySelectorAll('#mode-toggle button').forEach(b => {
+      const on = b.getAttribute('data-mode') === mode;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    updateSessionMeta();
+  }
+  document.querySelectorAll('#mode-toggle button').forEach(b => {
+    b.addEventListener('click', () => setMode(b.getAttribute('data-mode')));
+  });
+
+  // ---------- end / resume session ----------
+  const endBtn = document.getElementById('end-session');
+  endBtn.addEventListener('click', () => {
+    if (sessionEndedAt) {
+      // RESUME: reset start so the existing elapsed continues from where we paused
+      const paused = sessionEndedAt - sessionStartMs;
+      sessionStartMs = Date.now() - paused;  // shift start back so total stays the same
+      sessionEndedAt = null;
+      endBtn.textContent = '[ end session ]';
+      document.getElementById('sb-saved').textContent = 'resumed · ' + fmtTimeShort(new Date());
+    } else {
+      // END: freeze stopwatch + persist durations
+      sessionEndedAt = Date.now();
+      sessions.forEach(s => {
+        if (!s.durationMs) s.durationMs = sessionEndedAt - s.started;
+      });
+      saveSessions(dateStr, sessions);
+      markSaved();
+      endBtn.textContent = '[ resume session ]';
+      document.getElementById('sb-saved').textContent = 'session ended · ' + fmtTimeShort(new Date());
+    }
+    updateSessionMeta();
+  });
+
+  // ---------- track overlay ----------
+  const trackOverlay = document.getElementById('track-overlay');
+  function buildTrack() {
+    const days = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today); d.setDate(today.getDate() - i);
+      const key = fmtDate(d);
+      let w = 0, mins = 0;
+      try {
+        const raw = localStorage.getItem(SK_SESSIONS(key));
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            arr.forEach(s => {
+              w += countWords(s.text);
+              mins += (s.durationMs || 0) / 60000;
+            });
+          }
+        }
+      } catch (e) {}
+      days.push({ key, d, w, mins: Math.round(mins) });
+    }
+
+    // bar charts
+    drawBars('track-words-chart', days.map(d => d.w), accent.hex, false);
+    drawBars('track-time-chart', days.map(d => d.mins), accent.hex, true);
+
+    // streak (consecutive days going back from today with >0 words)
+    let streak = 0;
+    for (let i = days.length - 1; i >= 0; i--) {
+      if (days[i].w > 0) streak++;
+      else break;
+    }
+    document.getElementById('track-streak').textContent = streak;
+    document.getElementById('track-total-words').textContent = days.reduce((s,d)=>s+d.w, 0);
+
+    // themes — tokenize all text in last 30 days + history
+    const STOP = new Set(['the','and','for','that','with','this','have','from','you','your','was','were','are','but','not','they','their','what','when','where','which','will','would','could','should','about','because','just','like','only','some','more','than','also','really','very','into','over','then','them','them','our','they','still','being','through','these','those','here','there','today','tomorrow','yesterday']);
+    const freq = {};
+    days.forEach(d => {
+      try {
+        const raw = localStorage.getItem(SK_SESSIONS(d.key));
+        if (!raw) return;
+        const arr = JSON.parse(raw);
+        arr.forEach(s => {
+          (s.text || '').toLowerCase().replace(/[^a-z\s']/g,' ').split(/\s+/).forEach(w => {
+            if (w.length > 3 && !STOP.has(w)) freq[w] = (freq[w]||0)+1;
+          });
+        });
+      } catch (e) {}
+    });
+    readHistory().forEach(h => {
+      const txt = (h.oneliner || '') + ' ' + ((h.values && h.values.free) || '');
+      txt.toLowerCase().replace(/[^a-z\s']/g,' ').split(/\s+/).forEach(w => {
+        if (w.length > 3 && !STOP.has(w)) freq[w] = (freq[w]||0)+1;
+      });
+    });
+    const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0, 15);
+    const cloud = document.getElementById('theme-cloud');
+    cloud.innerHTML = '';
+    const maxC = sorted[0] ? sorted[0][1] : 1;
+    sorted.forEach(([w, c]) => {
+      const span = document.createElement('span');
+      span.className = 't';
+      span.textContent = w;
+      const scale = 11 + (c / maxC) * 18;
+      span.style.fontSize = scale.toFixed(1) + 'px';
+      span.style.color = c > maxC * 0.6 ? 'var(--accent)' : 'var(--fg)';
+      cloud.appendChild(span);
+    });
+    if (!sorted.length) {
+      cloud.innerHTML = '<span style="color:var(--muted-2);font-family:var(--font-mono);font-size:11px;">// not enough text yet</span>';
+    }
+
+    // recent first lines (last 7 sessions across days)
+    const recent = [];
+    for (let i = 0; i < days.length && recent.length < 7; i++) {
+      const dayIdx = days.length - 1 - i;
+      const d = days[dayIdx];
+      try {
+        const raw = localStorage.getItem(SK_SESSIONS(d.key));
+        if (!raw) continue;
+        const arr = JSON.parse(raw);
+        arr.slice().sort((a,b)=>b.n-a.n).forEach(s => {
+          if (recent.length >= 7) return;
+          const firstLine = (s.text || '').trim().split(/\n/)[0];
+          if (!firstLine) return;
+          const twelve = firstLine.split(/\s+/).slice(0,12).join(' ');
+          recent.push({ date: d.key, text: twelve });
+        });
+      } catch (e) {}
+    }
+    const rl = document.getElementById('recent-lines');
+    rl.innerHTML = '';
+    if (!recent.length) {
+      rl.innerHTML = '<div style="color:var(--muted-2);font-family:var(--font-mono);font-size:11px;">// nothing yet</div>';
+    } else {
+      recent.forEach(r => {
+        const row = document.createElement('div');
+        row.className = 'recent-line';
+        const dt = document.createElement('div'); dt.className = 'date'; dt.textContent = r.date;
+        const tx = document.createElement('div'); tx.className = 'text'; tx.textContent = '"' + r.text + '…"';
+        row.appendChild(dt); row.appendChild(tx);
+        rl.appendChild(row);
+      });
+    }
+
+    // reflect kinds — async, server-dependent; noop silently if offline / no data
+    populateReflectKinds(days.map(d => d.key));
+
+    // ai summary — async, fetched lazily; rendered if available
+    populateTrackSummary({ background: true });
+  }
+
+  // ---------- ai track summary ----------
+  let trackSummaryLoading = false;
+  let trackSummaryCacheKey = null;
+
+  function setTrackSummaryText(msg, muted) {
+    const el = document.getElementById('track-summary-text');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.toggle('muted', !!muted);
+  }
+
+  async function populateTrackSummary({ force = false, background = false } = {}) {
+    if (trackSummaryLoading) return;
+    const windowDays = 30;
+    document.getElementById('track-summary-window').textContent = windowDays;
+
+    // cache today's summary in localStorage to avoid re-paying Gemini on every open
+    const cacheKey = `lifeOs.track.summary.${dateStr}.${windowDays}`;
+    trackSummaryCacheKey = cacheKey;
+    if (!force) {
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const obj = JSON.parse(cached);
+          if (obj && obj.ts && (Date.now() - obj.ts) < 6 * 60 * 60 * 1000 && obj.data) {
+            renderTrackSummary(obj.data);
+            return;
+          }
+        }
+      } catch (e) {}
+    }
+
+    const btn = document.getElementById('track-summary-refresh');
+    trackSummaryLoading = true;
+    if (btn) { btn.disabled = true; btn.textContent = '[ thinking… ]'; }
+    if (!background || force) setTrackSummaryText('// thinking through the last ' + windowDays + ' days…', true);
+
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 45000);
+      const res = await fetch('http://localhost:5757/api/journal/track/summary?window_days=' + windowDays, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+        signal: ctrl.signal,
+      });
+      clearTimeout(tid);
+      if (!res.ok) throw new Error('http ' + res.status);
+      const data = await res.json();
+      if (!data || !data.summary) throw new Error('empty');
+      try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data })); } catch (e) {}
+      renderTrackSummary(data);
+    } catch (e) {
+      setTrackSummaryText('// summary unavailable (write a few more entries, or try refresh)', true);
+      document.getElementById('track-momentum').style.display = 'none';
+      document.getElementById('track-shifts-wrap').style.display = 'none';
+      document.getElementById('track-memorable-wrap').style.display = 'none';
+    } finally {
+      trackSummaryLoading = false;
+      if (btn) { btn.disabled = false; btn.textContent = '[ refresh ]'; }
+    }
+  }
+
+  function renderTrackSummary(data) {
+    setTrackSummaryText(data.summary || '// no summary', false);
+
+    // momentum
+    const mom = data.momentum;
+    const momEl = document.getElementById('track-momentum');
+    if (mom && (mom.trend || mom.note)) {
+      momEl.style.display = '';
+      document.getElementById('track-momentum-trend').textContent = mom.trend ? ('momentum: ' + mom.trend) : 'momentum';
+      document.getElementById('track-momentum-note').textContent = mom.note || '';
+    } else {
+      momEl.style.display = 'none';
+    }
+
+    // shifts
+    const shifts = Array.isArray(data.shifts) ? data.shifts.filter(s => typeof s === 'string' && s.trim()) : [];
+    const shiftsWrap = document.getElementById('track-shifts-wrap');
+    const shiftsList = document.getElementById('track-shifts-list');
+    shiftsList.innerHTML = '';
+    if (shifts.length) {
+      shiftsWrap.style.display = '';
+      shifts.forEach(s => {
+        const li = document.createElement('li');
+        li.textContent = s;
+        shiftsList.appendChild(li);
+      });
+    } else {
+      shiftsWrap.style.display = 'none';
+    }
+
+    // memorable lines
+    const mems = Array.isArray(data.memorable_lines) ? data.memorable_lines : [];
+    const memWrap = document.getElementById('track-memorable-wrap');
+    const memList = document.getElementById('track-memorable-list');
+    memList.innerHTML = '';
+    if (mems.length) {
+      memWrap.style.display = '';
+      mems.forEach(m => {
+        if (!m || !m.quote) return;
+        const row = document.createElement('div');
+        row.className = 'track-memorable-line';
+        const dt = document.createElement('div'); dt.className = 'date'; dt.textContent = m.date || '';
+        const qt = document.createElement('div'); qt.className = 'quote'; qt.textContent = '"' + m.quote + '"';
+        row.appendChild(dt); row.appendChild(qt);
+        memList.appendChild(row);
+      });
+    } else {
+      memWrap.style.display = 'none';
+    }
+  }
+
+  // pull recent feedback files via server, tally reflect kinds.
+  async function populateReflectKinds(dateKeys) {
+    const section = document.getElementById('reflect-kinds-section');
+    const host = document.getElementById('reflect-kinds');
+    if (!section || !host) return;
+    section.style.display = 'none';
+    host.innerHTML = '';
+
+    const KIND_ORDER = ['should-count', 'hedge', 'echo', 'repetition', 'theme', 'rhythm', 'tone-shift', 'open-question', 'other'];
+    const counts = {};
+    KIND_ORDER.forEach(k => counts[k] = 0);
+
+    // probe server cheaply: HEAD-ish via short-timeout GET on today
+    let probed = false;
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 600);
+      const probe = await fetch('http://localhost:5757/api/journal/feedback/' + dateStr, { signal: ctrl.signal });
+      clearTimeout(tid);
+      probed = probe.ok || probe.status === 404;
+    } catch (e) { /* no server */ }
+    if (!probed) return;
+
+    let total = 0;
+    await Promise.all(dateKeys.slice(-30).map(async k => {
+      try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 800);
+        const res = await fetch('http://localhost:5757/api/journal/feedback/' + k, { signal: ctrl.signal });
+        clearTimeout(tid);
+        if (!res.ok) return;
+        const fb = await res.json();
+        if (fb && Array.isArray(fb.reflect)) {
+          fb.reflect.forEach(r => {
+            const kind = r && r.kind ? r.kind : 'other';
+            if (kind in counts) counts[kind]++;
+            else counts.other++;
+            total++;
+          });
+        }
+      } catch (e) { /* skip this day */ }
+    }));
+
+    if (total === 0) return;
+
+    section.style.display = '';
+    const max = Math.max(1, ...Object.values(counts));
+    KIND_ORDER.forEach(kind => {
+      const c = counts[kind];
+      if (c === 0) return;
+      const row = document.createElement('div'); row.className = 'rk-row';
+      const lbl = document.createElement('div'); lbl.textContent = kind;
+      const barWrap = document.createElement('div'); barWrap.className = 'rk-bar-wrap';
+      const bar = document.createElement('div'); bar.className = 'rk-bar';
+      bar.style.width = ((c / max) * 100).toFixed(1) + '%';
+      barWrap.appendChild(bar);
+      const cnt = document.createElement('div'); cnt.className = 'rk-count'; cnt.textContent = c;
+      row.appendChild(lbl); row.appendChild(barWrap); row.appendChild(cnt);
+      host.appendChild(row);
+    });
+  }
+
+  function drawBars(id, values, color, muted) {
+    const svg = document.getElementById(id);
+    svg.innerHTML = '';
+    const W = 300, H = 100, PAD = 4;
+    const n = values.length;
+    if (!n) return;
+    const max = Math.max(1, ...values);
+    const bw = (W - PAD * 2) / n - 1;
+    values.forEach((v, i) => {
+      const h = (v / max) * (H - PAD * 2);
+      const x = PAD + i * (bw + 1);
+      const y = H - PAD - h;
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', x.toFixed(2));
+      rect.setAttribute('y', y.toFixed(2));
+      rect.setAttribute('width', bw.toFixed(2));
+      rect.setAttribute('height', Math.max(1, h).toFixed(2));
+      if (muted) {
+        rect.setAttribute('fill', 'var(--muted-2)');
+        rect.setAttribute('stroke', color);
+        rect.setAttribute('stroke-width', '0.5');
+      } else {
+        rect.setAttribute('fill', color);
+      }
+      svg.appendChild(rect);
+    });
+  }
+
+  function openTrack() {
+    buildTrack();
+    trackOverlay.classList.add('open');
+    trackOverlay.setAttribute('aria-hidden', 'false');
+  }
+  function closeTrack() {
+    trackOverlay.classList.remove('open');
+    trackOverlay.setAttribute('aria-hidden', 'true');
+  }
+  document.getElementById('open-track').addEventListener('click', openTrack);
+  document.getElementById('track-close').addEventListener('click', closeTrack);
+  document.getElementById('track-summary-refresh').addEventListener('click', () => populateTrackSummary({ force: true }));
+  trackOverlay.addEventListener('click', (e) => {
+    if (e.target === trackOverlay) closeTrack();
+  });
+
+  // ---------- cheatsheet ----------
+  const cheat = document.getElementById('cheat');
+  function toggleCheat(force) {
+    if (force === true) cheat.classList.add('open');
+    else if (force === false) cheat.classList.remove('open');
+    else cheat.classList.toggle('open');
+  }
+  document.getElementById('cheat-toggle').addEventListener('click', () => toggleCheat());
+  document.getElementById('close-cheat').addEventListener('click', () => toggleCheat(false));
+
+  // ---------- markdown-ish on enter for textareas (--- and # ) ----------
+  // (kept lightweight: handled at save-time as visual rendering is plain-text — see below for fragment processing)
+  // Implemented inline: when user types "---\n" or "# " at line-start, we rewrite the textarea value lightly.
+  blocksHost.addEventListener('keydown', (e) => {
+    const ta = e.target;
+    if (!(ta instanceof HTMLTextAreaElement)) return;
+    if (e.key !== 'Enter') return;
+    const v = ta.value;
+    const pos = ta.selectionStart;
+    const lineStart = v.lastIndexOf('\n', pos - 1) + 1;
+    const currentLine = v.slice(lineStart, pos);
+    if (currentLine === '---') {
+      e.preventDefault();
+      // replace --- with a visible hairline rendered via unicode + new paragraph
+      const replacement = '────────────────';
+      ta.value = v.slice(0, lineStart) + replacement + '\n\n' + v.slice(pos);
+      ta.selectionStart = ta.selectionEnd = lineStart + replacement.length + 2;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    // # header: don't transform DOM; just leave it as text (plain editor). User intent honored visually
+    // by the monospace look of the line — we don't fight the textarea.
+  });
+
+  // ---------- force-flush autosave ----------
+  function flushAutosaveNow() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    saveSessions(dateStr, sessions);
+    const el = document.getElementById('sb-saved');
+    if (el) {
+      el.textContent = 'saved · just now';
+      el.style.color = 'var(--accent)';
+      clearTimeout(flushAutosaveNow._t);
+      flushAutosaveNow._t = setTimeout(() => {
+        el.style.color = '';
+        el.textContent = `saved · ${fmtTimeShort(new Date())}`;
+      }, 1200);
+    }
+  }
+
+  // ---------- keyboard shortcuts ----------
+  document.addEventListener('keydown', (e) => {
+    const meta = e.metaKey || e.ctrlKey;
+    if (meta && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      toggleSidebar();
+      return;
+    }
+    if (meta && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      flushAutosaveNow();
+      return;
+    }
+    if (meta && e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      globalPrompt();
+      return;
+    }
+    if (meta && e.key.toLowerCase() === 't') {
+      e.preventDefault();
+      openTrack();
+      return;
+    }
+    if (meta && e.key === '/') {
+      e.preventDefault();
+      toggleCheat();
+      return;
+    }
+    if (meta && e.key === 'Enter') {
+      e.preventDefault();
+      // publish whichever block contains the focused textarea (or topmost)
+      const ae = document.activeElement;
+      let blockEl = ae && ae.closest ? ae.closest('.block') : null;
+      if (!blockEl) blockEl = blocksHost.querySelector('.block');
+      if (!blockEl) return;
+      const n = parseInt(blockEl.dataset.n, 10);
+      const s = sessions.find(x => x.n === n);
+      if (s && blockEl.__ta) publishBlock(s, blockEl, blockEl.__ta);
+      return;
+    }
+    if (e.key === 'Escape') {
+      if (trackOverlay.classList.contains('open')) { closeTrack(); return; }
+      if (cheat.classList.contains('open')) { toggleCheat(false); return; }
+    }
+  });
+
+  // ---------- scroll restore ----------
+  window.addEventListener('scroll', () => {
+    localStorage.setItem(SK_SCROLL(dateStr), String(window.scrollY));
+  }, { passive: true });
+
+  // ---------- focus mode ----------
+  // Adds body.focus-mode while the user has been typing recently. Fades chrome.
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const FOCUS_IDLE_MS = 6000;
+  let focusTimer = null;
+  let activeBlockN = null;
+  function setActiveBlock(n) {
+    activeBlockN = n;
+    document.querySelectorAll('#blocks-host .block').forEach(b => {
+      const isActive = parseInt(b.dataset.n, 10) === n;
+      b.classList.toggle('active', isActive);
+      b.classList.toggle('inactive', !isActive);
+    });
+  }
+  function enterFocus(n) {
+    document.body.classList.add('focus-mode');
+    if (typeof n === 'number') setActiveBlock(n);
+    if (focusTimer) clearTimeout(focusTimer);
+    focusTimer = setTimeout(exitFocus, FOCUS_IDLE_MS);
+  }
+  function exitFocus() {
+    document.body.classList.remove('focus-mode');
+    if (focusTimer) { clearTimeout(focusTimer); focusTimer = null; }
+    document.querySelectorAll('#blocks-host .block').forEach(b => {
+      b.classList.remove('active'); b.classList.remove('inactive');
+    });
+    activeBlockN = null;
+  }
+  // hook into input events on any textarea inside blocks-host
+  blocksHost.addEventListener('input', (e) => {
+    const ta = e.target;
+    if (!(ta instanceof HTMLTextAreaElement)) return;
+    const blockEl = ta.closest('.block');
+    if (!blockEl) return;
+    const n = parseInt(blockEl.dataset.n, 10);
+    enterFocus(n);
+  });
+  // click outside any textarea = exit focus
+  document.addEventListener('mousedown', (e) => {
+    if (!document.body.classList.contains('focus-mode')) return;
+    const inTa = e.target && e.target.closest && e.target.closest('textarea');
+    if (!inTa) exitFocus();
+  });
+  // esc exits focus immediately
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('focus-mode')) {
+      exitFocus();
+    }
+  });
+
+  // ---------- milestone tick on word count (every 100 words) ----------
+  let lastMilestone = 0;
+  function checkMilestone() {
+    const totalWords = sessions.reduce((sum, s) => sum + countWords(s.text), 0);
+    const m = Math.floor(totalWords / 100);
+    if (m > lastMilestone && totalWords > 0) {
+      lastMilestone = m;
+      const el = document.getElementById('sb-words');
+      if (!el || reduceMotion) return;
+      el.classList.add('tick');
+      setTimeout(() => el.classList.remove('tick'), 600);
+    } else if (m < lastMilestone) {
+      lastMilestone = m;
+    }
+  }
+  // wrap into updateSessionMeta cycle
+  const _origUpdate = updateSessionMeta;
+  updateSessionMeta = function() { _origUpdate(); checkMilestone(); };
+
+  // ---------- hold-to-publish (600ms) ----------
+  function attachHoldToPublish(btn, fill, labelEl, fire) {
+    const HOLD_MS = 600;
+    let raf = null, startedAt = 0, held = false, origLabel = labelEl.textContent;
+    function reset() {
+      held = false;
+      if (raf) { cancelAnimationFrame(raf); raf = null; }
+      fill.style.width = '0%';
+      btn.classList.remove('holding');
+      labelEl.textContent = origLabel;
+    }
+    function tick() {
+      const pct = Math.min(100, ((performance.now() - startedAt) / HOLD_MS) * 100);
+      fill.style.width = pct.toFixed(1) + '%';
+      labelEl.textContent = '... committing ' + Math.round(pct) + '%';
+      if (pct >= 100) {
+        reset();
+        fire();
+        return;
+      }
+      raf = requestAnimationFrame(tick);
+    }
+    function start(e) {
+      // accessibility: skip the hold mechanic entirely — let the click pass through
+      if (reduceMotion) return;
+      e.preventDefault();
+      origLabel = labelEl.textContent;
+      held = true;
+      startedAt = performance.now();
+      btn.classList.add('holding');
+      raf = requestAnimationFrame(tick);
+    }
+    function cancel(e) {
+      if (!held) return;
+      reset();
+    }
+    btn.addEventListener('mousedown', start);
+    btn.addEventListener('touchstart', start, { passive: false });
+    btn.addEventListener('mouseup', cancel);
+    btn.addEventListener('mouseleave', cancel);
+    btn.addEventListener('touchend', cancel);
+    btn.addEventListener('touchcancel', cancel);
+    btn.addEventListener('click', (e) => {
+      // Reduced-motion path: let click through (instant publish).
+      if (reduceMotion) { fire(); return; }
+      // Normal path: gesture owns publish — swallow accidental clicks.
+      e.preventDefault();
+    });
+  }
+
+  // ---------- init ----------
+  renderAllBlocks();
+  updateSessionMeta();
+
+  // restore scroll
+  const sy = parseInt(localStorage.getItem(SK_SCROLL(dateStr)) || '0', 10);
+  if (sy) requestAnimationFrame(() => window.scrollTo(0, sy));
+
+  // initial feedback pass after a moment, if there's prior text on this day
+  setTimeout(() => regenerateFeedback(), 1200);
+
+  // initial conversation rehydrate (network preferred, cache fallback)
+  bootConversation();
+
+})();
+</script>
+</body>
+</html>
